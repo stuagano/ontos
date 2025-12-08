@@ -678,7 +678,7 @@ class LLMSearchManager:
         client = self._get_openai_client()
         total_tool_calls = 0
         sources: List[Dict[str, Any]] = []
-        max_iterations = 5  # Prevent infinite loops
+        max_iterations = 10  # Prevent infinite loops (increased for complex multi-tool queries)
         
         for iteration in range(max_iterations):
             # Build messages for LLM
@@ -758,8 +758,8 @@ class LLMSearchManager:
                 return assistant_message.content or "", total_tool_calls, sources
         
         # Max iterations reached
-        logger.warning("Max LLM iterations reached")
-        return "I apologize, but I wasn't able to complete your request. Please try rephrasing your question.", total_tool_calls, sources
+        logger.warning(f"Max LLM iterations ({max_iterations}) reached after {total_tool_calls} tool calls")
+        return f"I apologize, but I reached the maximum number of steps ({max_iterations}) while processing your request. I made {total_tool_calls} tool calls. Please try a simpler question or break it into smaller parts.", total_tool_calls, sources
     
     def _get_openai_client(self):
         """Get OpenAI client for Databricks LLM serving endpoint.
