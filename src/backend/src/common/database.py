@@ -786,14 +786,11 @@ def init_db() -> None:
             logger.info("Attempting Alembic upgrade to head...")
             try:
                 target_schema = settings.POSTGRES_DB_SCHEMA or 'public'
-                # Use connect() and let Alembic manage transactions via begin_transaction()
-                # This avoids nested transaction (SAVEPOINT) issues with Lakebase/PostgreSQL
-                with _engine.connect() as connection:
-                    # Set search_path to ensure migrations run in correct schema
-                    connection.execute(text(f'SET search_path TO "{target_schema}"'))
-                    # Pass connection to Alembic - Alembic's begin_transaction() will handle commit
-                    alembic_cfg.attributes['connection'] = connection
-                    alembic_command.upgrade(alembic_cfg, "head")
+                # Pass engine to Alembic - let it fully manage connection and transaction lifecycle
+                # This avoids all transaction state conflicts that caused hangs with Lakebase
+                alembic_cfg.attributes['engine'] = _engine
+                alembic_cfg.attributes['target_schema'] = target_schema
+                alembic_command.upgrade(alembic_cfg, "head")
                 logger.info("✓ Alembic upgrade to head COMPLETED.")
             except Exception as alembic_err:
                 logger.critical("Alembic upgrade failed! Manual intervention may be required.", exc_info=True)
@@ -839,12 +836,11 @@ def init_db() -> None:
             # Stamp the database with the baseline migration
             logger.info("Stamping database with baseline migration...")
             try:
-                # Use connect() and let Alembic manage transactions via begin_transaction()
-                # This avoids nested transaction (SAVEPOINT) issues with Lakebase/PostgreSQL
-                with _engine.connect() as connection:
-                    connection.execute(text(f'SET search_path TO "{target_schema}"'))
-                    alembic_cfg.attributes['connection'] = connection
-                    alembic_command.stamp(alembic_cfg, "head")
+                # Pass engine to Alembic - let it fully manage connection and transaction lifecycle
+                # This avoids all transaction state conflicts that caused hangs with Lakebase
+                alembic_cfg.attributes['engine'] = _engine
+                alembic_cfg.attributes['target_schema'] = target_schema
+                alembic_command.stamp(alembic_cfg, "head")
                 logger.info("✓ Database stamped with baseline migration.")
             except Exception as stamp_err:
                 logger.error(f"Failed to stamp database: {stamp_err}", exc_info=True)

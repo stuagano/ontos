@@ -1,6 +1,6 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
+from sqlalchemy import engine_from_config, text
 from sqlalchemy import pool
 
 from alembic import context
@@ -106,31 +106,38 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    # Check if a connection was provided via config.attributes
-    # This allows database.py to pass an existing connection to avoid connection issues
-    connectable = config.attributes.get('connection', None)
+    # Check if an engine was provided via config.attributes (from database.py)
+    # This engine has OAuth token injection configured for Lakebase
+    provided_engine = config.attributes.get('engine', None)
+    target_schema = config.attributes.get('target_schema', None)
     
-    if connectable is not None:
-        # Use the provided connection directly
-        # The caller (database.py) uses connect() without starting a transaction,
-        # so we let Alembic manage the transaction via begin_transaction().
-        # This avoids nested transaction (SAVEPOINT) issues with PostgreSQL/Lakebase.
-        context.configure(
-            connection=connectable,
-            target_metadata=target_metadata,
-            include_object=include_object
-        )
-        
-        with context.begin_transaction():
-            context.run_migrations()
+    if provided_engine is not None:
+        # Use the provided engine - it has OAuth token injection configured
+        # Alembic creates and fully manages its own connection and transaction
+        # This avoids all transaction state conflicts that caused hangs with Lakebase
+        with provided_engine.connect() as connection:
+            # Set search_path and commit BEFORE starting migration transaction
+            # This ensures clean transaction state when begin_transaction() runs
+            if target_schema:
+                connection.execute(text(f'SET search_path TO "{target_schema}"'))
+                connection.commit()  # Commit SET so it's not part of migration transaction
+            
+            context.configure(
+                connection=connection,
+                target_metadata=target_metadata,
+                include_object=include_object
+            )
+            
+            with context.begin_transaction():
+                context.run_migrations()
     else:
-        # Create our own engine and connection (normal standalone mode)
+        # Standalone mode - create own engine (for CLI usage like `alembic upgrade head`)
         # Use a dictionary to pass the URL directly
         configuration = config.get_section(config.config_ini_section, {})
-        configuration["sqlalchemy.url"] = DB_URL # <--- Set the URL here
+        configuration["sqlalchemy.url"] = DB_URL
 
         connectable = engine_from_config(
-            configuration, # Pass the modified configuration
+            configuration,
             prefix="sqlalchemy.",
             poolclass=pool.NullPool,
         )
@@ -139,7 +146,7 @@ def run_migrations_online() -> None:
             context.configure(
                 connection=connection, 
                 target_metadata=target_metadata,
-                include_object=include_object # Pass the hook function
+                include_object=include_object
             )
 
             with context.begin_transaction():
