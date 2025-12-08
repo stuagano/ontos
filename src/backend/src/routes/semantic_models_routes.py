@@ -147,6 +147,7 @@ async def upload_semantic_model(
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
             PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
             PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+            PREFIX owl: <http://www.w3.org/2002/07/owl#>
             SELECT (COUNT(DISTINCT ?concept) AS ?count) WHERE {
                 {
                     ?concept a rdfs:Class .
@@ -154,10 +155,13 @@ async def upload_semantic_model(
                     ?concept a skos:Concept .
                 } UNION {
                     ?concept a skos:ConceptScheme .
+                } UNION {
+                    ?concept a owl:Class .
                 }
                 FILTER(!STRSTARTS(STR(?concept), "http://www.w3.org/1999/02/22-rdf-syntax-ns#"))
                 FILTER(!STRSTARTS(STR(?concept), "http://www.w3.org/2000/01/rdf-schema#"))
                 FILTER(!STRSTARTS(STR(?concept), "http://www.w3.org/2004/02/skos/core#"))
+                FILTER(!STRSTARTS(STR(?concept), "http://www.w3.org/2002/07/owl#"))
             }
             """
             count_results = list(temp_graph.query(concepts_query))

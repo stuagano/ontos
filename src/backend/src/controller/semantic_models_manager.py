@@ -2,7 +2,7 @@ from typing import List, Optional, Dict, Any
 from pathlib import Path
 from datetime import datetime, timedelta
 from rdflib import Graph, ConjunctiveGraph, Dataset
-from rdflib.namespace import RDF, RDFS, SKOS
+from rdflib.namespace import RDF, RDFS, SKOS, OWL
 from rdflib import URIRef, Literal, Namespace
 from sqlalchemy.orm import Session
 import signal
@@ -100,6 +100,7 @@ class SemanticModelsManager:
             self._db.add(db_obj)
         self._db.flush()
         self._db.refresh(db_obj)
+        self._db.commit()  # Persist changes immediately since manager uses singleton session
         return self._to_api(db_obj)
 
     def update(self, model_id: str, update: SemanticModelUpdate, updated_by: Optional[str]) -> Optional[SemanticModelApi]:
@@ -112,6 +113,7 @@ class SemanticModelsManager:
             self._db.add(updated)
         self._db.flush()
         self._db.refresh(updated)
+        self._db.commit()  # Persist changes immediately since manager uses singleton session
         return self._to_api(updated)
 
     def replace_content(self, model_id: str, content_text: str, original_filename: Optional[str], content_type: Optional[str], size_bytes: Optional[int], updated_by: Optional[str]) -> Optional[SemanticModelApi]:
@@ -130,6 +132,7 @@ class SemanticModelsManager:
         self._db.add(db_obj)
         self._db.flush()
         self._db.refresh(db_obj)
+        self._db.commit()  # Persist changes immediately since manager uses singleton session
         return self._to_api(db_obj)
 
     def delete(self, model_id: str) -> bool:
@@ -150,6 +153,7 @@ class SemanticModelsManager:
         
         # Delete from database
         obj = semantic_models_repo.remove(self._db, id=model_id)
+        self._db.commit()  # Persist changes immediately since manager uses singleton session
         return obj is not None
 
     def preview(self, model_id: str, max_chars: int = 2000) -> Optional[SemanticModelPreview]:
@@ -1012,6 +1016,7 @@ class SemanticModelsManager:
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
             PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
             PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+            PREFIX owl: <http://www.w3.org/2002/07/owl#>
             SELECT DISTINCT ?concept ?label ?comment WHERE {
                 {
                     ?concept a rdfs:Class .
@@ -1020,11 +1025,13 @@ class SemanticModelsManager:
                 } UNION {
                     ?concept a skos:ConceptScheme .
                 } UNION {
+                    ?concept a owl:Class .
+                } UNION {
                     # Include any resource that is used as a class (has instances or subclasses)
                     ?concept rdfs:subClassOf ?parent .
                 } UNION {
                     ?instance a ?concept .
-                    FILTER(?concept != rdfs:Class && ?concept != skos:Concept && ?concept != rdf:Property)
+                    FILTER(?concept != rdfs:Class && ?concept != skos:Concept && ?concept != rdf:Property && ?concept != owl:Class)
                 } UNION {
                     # Include resources with semantic properties that make them conceptual
                     ?concept rdfs:label ?someLabel .
@@ -1041,10 +1048,11 @@ class SemanticModelsManager:
                 OPTIONAL { ?concept rdfs:comment ?rdfs_comment }
                 BIND(COALESCE(STR(?skos_definition), STR(?rdfs_comment)) AS ?comment)
 
-                # Filter out basic RDF/RDFS/SKOS vocabulary terms
+                # Filter out basic RDF/RDFS/SKOS/OWL vocabulary terms
                 FILTER(!STRSTARTS(STR(?concept), "http://www.w3.org/1999/02/22-rdf-syntax-ns#"))
                 FILTER(!STRSTARTS(STR(?concept), "http://www.w3.org/2000/01/rdf-schema#"))
                 FILTER(!STRSTARTS(STR(?concept), "http://www.w3.org/2004/02/skos/core#"))
+                FILTER(!STRSTARTS(STR(?concept), "http://www.w3.org/2002/07/owl#"))
             }
             ORDER BY ?concept
             """
@@ -1082,6 +1090,8 @@ class SemanticModelsManager:
 
                     # Determine concept type
                     if (concept_uri, RDF.type, RDFS.Class) in context:
+                        concept_type = "class"
+                    elif (concept_uri, RDF.type, OWL.Class) in context:
                         concept_type = "class"
                     elif (concept_uri, RDF.type, SKOS.Concept) in context:
                         concept_type = "concept"
