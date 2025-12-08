@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { TreeView } from '@/components/ui/tree-view'
+import { Folder, FolderOpen, Table, Layout } from 'lucide-react'
 import type { MetastoreTableInfo } from '@/types/data-product'
 
 interface DatasetLookupDialogProps {
@@ -12,7 +13,23 @@ interface DatasetLookupDialogProps {
 }
 
 type CatalogItem = { id: string; name: string; type: 'catalog' | 'schema' | 'table' | 'view'; children: CatalogItem[]; hasChildren: boolean }
-type TreeViewItem = { id: string; name: string; children?: TreeViewItem[]; onClick?: () => void; expanded?: boolean; onExpand?: () => void; hasChildren: boolean; loading?: boolean }
+type TreeViewItem = { id: string; name: string; icon?: React.ReactNode; children?: TreeViewItem[]; onClick?: () => void; expanded?: boolean; onExpand?: () => void; onCollapse?: () => void; hasChildren: boolean; loading?: boolean }
+
+// Icon helper matching catalog commander style
+const getIcon = (type: string) => {
+  switch (type) {
+    case 'catalog':
+      return <Folder className="h-4 w-4 text-blue-500" />
+    case 'schema':
+      return <FolderOpen className="h-4 w-4 text-green-500" />
+    case 'table':
+      return <Table className="h-4 w-4 text-orange-500" />
+    case 'view':
+      return <Layout className="h-4 w-4 text-purple-500" />
+    default:
+      return null
+  }
+}
 
 export default function DatasetLookupDialog({ isOpen, onOpenChange, onSelect }: DatasetLookupDialogProps) {
   const [search, setSearch] = useState('')
@@ -64,6 +81,14 @@ export default function DatasetLookupDialog({ isOpen, onOpenChange, onSelect }: 
     }
   }
 
+  const handleCollapse = (itemId: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      next.delete(itemId)
+      return next
+    })
+  }
+
   useEffect(() => { if (isOpen) fetchCatalogs() }, [isOpen])
 
   // Apply filter only at the current level; once navigating deeper, show all children
@@ -79,10 +104,12 @@ export default function DatasetLookupDialog({ isOpen, onOpenChange, onSelect }: 
       .map((n) => ({
         id: n.id,
         name: n.name,
+        icon: getIcon(n.type),
         hasChildren: n.hasChildren || (n.children && n.children.length > 0),
         expanded: expanded.has(n.id),
         onExpand: () => handleExpand(n),
-        onClick: n.type === 'table' ? () => {
+        onCollapse: () => handleCollapse(n.id),
+        onClick: (n.type === 'table' || n.type === 'view') ? () => {
           const [catalog_name, schema_name, table_name] = n.id.split('.')
           onSelect({ catalog_name, schema_name, table_name, full_name: n.id })
           onOpenChange(false)
@@ -97,7 +124,7 @@ export default function DatasetLookupDialog({ isOpen, onOpenChange, onSelect }: 
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[90vw]">
+      <DialogContent className="max-w-lg w-full">
         <DialogHeader>
           <DialogTitle>Find existing dataset</DialogTitle>
         </DialogHeader>
@@ -107,11 +134,11 @@ export default function DatasetLookupDialog({ isOpen, onOpenChange, onSelect }: 
             <Button className="h-8 px-2" type="button" variant="outline" onClick={fetchCatalogs} disabled={loading}>Refresh</Button>
           </div>
           {error && <div className="text-sm text-destructive">{error}</div>}
-          <div className="h-72 overflow-auto overflow-x-auto border rounded">
+          <div className="h-80 overflow-y-auto overflow-x-hidden border rounded">
             {loading ? (
               <div className="p-3 text-sm">Loading catalogs...</div>
             ) : (
-              <TreeView data={treeData as any} className="p-1 text-sm leading-tight whitespace-nowrap min-w-max" />
+              <TreeView data={treeData as any} className="p-1 text-sm leading-tight [&_span]:truncate [&_span]:max-w-[350px] [&_span]:inline-block" />
             )}
           </div>
         </div>
