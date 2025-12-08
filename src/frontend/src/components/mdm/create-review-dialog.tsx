@@ -64,17 +64,36 @@ export default function CreateReviewDialog({
         notes: values.notes || undefined,
       };
 
+      console.log('[CreateReviewDialog] Posting to:', `/api/mdm/runs/${runId}/create-review`, data);
       const response = await post<MdmCreateReviewResponse>(
         `/api/mdm/runs/${runId}/create-review`,
         data
       );
+      console.log('[CreateReviewDialog] Response:', response);
 
-      if (response.data) {
+      // Check for errors first (useApi returns empty object on error, not null)
+      if (response.error) {
+        toast({
+          title: 'Error',
+          description: response.error,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Verify we have a valid review_id before navigating
+      if (response.data && response.data.review_id) {
         toast({
           title: 'Success',
           description: `Review request created with ${response.data.candidate_count} candidates`,
         });
         onSuccess(response.data.review_id);
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to create review request - no review ID returned',
+          variant: 'destructive',
+        });
       }
     } catch (err: any) {
       toast({
