@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ColumnDef } from "@tanstack/react-table";
-import { Loader2, AlertCircle, ArrowLeft, Check, X, Eye, Code, ChevronDown } from 'lucide-react';
+import { Loader2, AlertCircle, ArrowLeft, Check, X, Eye, Code, ChevronDown, ArrowUpDown } from 'lucide-react';
 import { useApi } from '@/hooks/use-api';
 import { useToast } from "@/hooks/use-toast";
 import useBreadcrumbStore from '@/stores/breadcrumb-store';
@@ -159,24 +159,44 @@ export default function DataAssetReviewDetails() {
     const assetColumns = useMemo<ColumnDef<ReviewedAsset>[]>(() => [
         {
             accessorKey: "asset_fqn",
-            header: "Asset FQN",
+            header: ({ column }) => (
+                <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="h-8 px-2 -ml-2">
+                    Asset FQN
+                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
+            ),
             cell: ({ row }) => <span className="font-mono text-xs">{row.original.asset_fqn}</span>,
         },
         {
             accessorKey: "asset_type",
-            header: "Type",
+            header: ({ column }) => (
+                <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="h-8 px-2 -ml-2">
+                    Type
+                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
+            ),
             cell: ({ row }) => <Badge variant="secondary">{row.original.asset_type}</Badge>,
         },
         {
             accessorKey: "status",
-            header: "Status",
+            header: ({ column }) => (
+                <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="h-8 px-2 -ml-2">
+                    Status
+                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
+            ),
             cell: ({ row }) => (
                 <Badge variant={getAssetStatusColor(row.original.status)}>{row.original.status}</Badge>
             ),
         },
         {
             accessorKey: "updated_at",
-            header: "Last Reviewed",
+            header: ({ column }) => (
+                <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="h-8 px-2 -ml-2">
+                    Last Reviewed
+                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
+            ),
             cell: ({ row }) => <RelativeDate date={row.original.updated_at} />,
         },
         {
