@@ -9,6 +9,7 @@ from .tags import TagDb, TagNamespaceDb, TagNamespacePermissionDb, EntityTagAsso
 from .teams import TeamDb, TeamMemberDb
 from .projects import ProjectDb, project_team_association
 from .genie_spaces import GenieSpaceDb
+from .llm_sessions import LLMSessionDb, LLMMessageDb
 
 __all__ = [
     "DataProductDb",
@@ -26,4 +27,6 @@ __all__ = [
     "ProjectDb",
     "project_team_association",
     "GenieSpaceDb",
+    "LLMSessionDb",
+    "LLMMessageDb",
 ] 

@@ -454,66 +454,179 @@ TOOL_DEFINITIONS = [
 
 
 # ============================================================================
-# Session Storage (In-Memory for now, can be extended to Redis/DB)
+# Session Storage - Database-backed with in-memory cache
 # ============================================================================
 
-@dataclass
-class SessionStore:
-    """In-memory session storage with expiration."""
-    sessions: Dict[str, ConversationSession] = field(default_factory=dict)
-    max_sessions_per_user: int = 10
-    session_ttl_hours: int = 24
+from src.repositories.llm_sessions_repository import llm_sessions_repository, LLMSessionsRepository
+from src.db_models.llm_sessions import LLMSessionDb, LLMMessageDb
+
+# Type alias for clarity (Session is SQLAlchemy Session, already imported at top)
+SQLSession = Session
+
+
+class DatabaseSessionStore:
+    """
+    Database-backed session storage with in-memory write-through cache.
     
-    def get(self, session_id: str) -> Optional[ConversationSession]:
+    Sessions are persisted to the database but cached in memory for the
+    duration of a request to avoid repeated DB queries during tool execution.
+    """
+    
+    def __init__(self, repository: LLMSessionsRepository):
+        self._repository = repository
+        # In-memory cache for active sessions (within a request)
+        self._cache: Dict[str, ConversationSession] = {}
+        self.max_sessions_per_user: int = 50
+        self.session_ttl_days: int = 30
+    
+    def _db_to_pydantic(self, db_session: LLMSessionDb) -> ConversationSession:
+        """Convert DB session to Pydantic model."""
+        messages = []
+        for db_msg in db_session.messages:
+            tool_calls = None
+            if db_msg.tool_calls:
+                try:
+                    tool_calls_data = json.loads(db_msg.tool_calls)
+                    tool_calls = [
+                        ToolCall(
+                            id=tc['id'],
+                            name=ToolName(tc['name']),
+                            arguments=tc.get('arguments', {})
+                        )
+                        for tc in tool_calls_data
+                    ]
+                except (json.JSONDecodeError, KeyError, ValueError) as e:
+                    logger.warning(f"Failed to parse tool_calls for message {db_msg.id}: {e}")
+            
+            messages.append(ChatMessage(
+                id=db_msg.id,
+                role=MessageRole(db_msg.role),
+                content=db_msg.content,
+                tool_calls=tool_calls,
+                tool_call_id=db_msg.tool_call_id,
+                timestamp=db_msg.timestamp
+            ))
+        
+        return ConversationSession(
+            id=db_session.id,
+            user_id=db_session.user_id,
+            title=db_session.title,
+            messages=messages,
+            created_at=db_session.created_at,
+            updated_at=db_session.updated_at
+        )
+    
+    def get(self, db: SQLSession, session_id: str) -> Optional[ConversationSession]:
         """Get a session by ID."""
-        session = self.sessions.get(session_id)
-        if session:
-            # Check expiration
-            age_hours = (datetime.utcnow() - session.created_at).total_seconds() / 3600
-            if age_hours > self.session_ttl_hours:
-                del self.sessions[session_id]
-                return None
-        return session
+        # Check cache first
+        if session_id in self._cache:
+            return self._cache[session_id]
+        
+        # Load from database
+        db_session = self._repository.get_session(db, session_id)
+        if db_session:
+            session = self._db_to_pydantic(db_session)
+            self._cache[session_id] = session
+            return session
+        return None
     
-    def create(self, user_id: str) -> ConversationSession:
+    def get_for_user(self, db: SQLSession, session_id: str, user_id: str) -> Optional[ConversationSession]:
+        """Get a session by ID if owned by user."""
+        session = self.get(db, session_id)
+        if session and session.user_id == user_id:
+            return session
+        return None
+    
+    def create(self, db: SQLSession, user_id: str) -> ConversationSession:
         """Create a new session for a user."""
-        # Clean up old sessions for this user
-        user_sessions = [
-            (sid, s) for sid, s in self.sessions.items()
-            if s.user_id == user_id
-        ]
-        user_sessions.sort(key=lambda x: x[1].updated_at, reverse=True)
-        
-        # Remove oldest if over limit
-        while len(user_sessions) >= self.max_sessions_per_user:
-            old_sid, _ = user_sessions.pop()
-            del self.sessions[old_sid]
-        
-        session = ConversationSession(user_id=user_id)
-        self.sessions[session.id] = session
+        db_session = self._repository.create_session(db, user_id)
+        session = self._db_to_pydantic(db_session)
+        self._cache[session.id] = session
         return session
     
-    def delete(self, session_id: str) -> bool:
-        """Delete a session."""
-        if session_id in self.sessions:
-            del self.sessions[session_id]
-            return True
-        return False
-    
-    def list_for_user(self, user_id: str) -> List[SessionSummary]:
-        """List sessions for a user."""
-        result = []
-        for session in self.sessions.values():
-            if session.user_id == user_id:
-                result.append(SessionSummary(
-                    id=session.id,
-                    title=session.title,
-                    message_count=len(session.messages),
-                    created_at=session.created_at,
-                    updated_at=session.updated_at
-                ))
-        result.sort(key=lambda x: x.updated_at, reverse=True)
+    def delete(self, db: SQLSession, session_id: str, user_id: str) -> bool:
+        """Delete a session if owned by user."""
+        result = self._repository.delete_session_for_user(db, session_id, user_id)
+        if result and session_id in self._cache:
+            del self._cache[session_id]
         return result
+    
+    def list_for_user(self, db: SQLSession, user_id: str) -> List[SessionSummary]:
+        """List sessions for a user."""
+        db_sessions = self._repository.list_sessions_for_user(db, user_id, limit=self.max_sessions_per_user)
+        return [
+            SessionSummary(
+                id=s.id,
+                title=s.title,
+                message_count=len(s.messages),
+                created_at=s.created_at,
+                updated_at=s.updated_at
+            )
+            for s in db_sessions
+        ]
+    
+    def add_message(
+        self,
+        db: SQLSession,
+        session_id: str,
+        role: MessageRole,
+        content: Optional[str] = None,
+        tool_calls: Optional[List[ToolCall]] = None,
+        tool_call_id: Optional[str] = None
+    ) -> ChatMessage:
+        """Add a message to a session and persist to DB."""
+        db_session = self._repository.get_session(db, session_id)
+        if not db_session:
+            raise ValueError(f"Session {session_id} not found")
+        
+        # Serialize tool calls for DB
+        tool_calls_json = None
+        if tool_calls:
+            tool_calls_json = [
+                {'id': tc.id, 'name': tc.name.value, 'arguments': tc.arguments}
+                for tc in tool_calls
+            ]
+        
+        db_message = self._repository.add_message(
+            db=db,
+            session=db_session,
+            role=role.value,
+            content=content,
+            tool_calls=tool_calls_json,
+            tool_call_id=tool_call_id
+        )
+        
+        # Create Pydantic message
+        message = ChatMessage(
+            id=db_message.id,
+            role=role,
+            content=content,
+            tool_calls=tool_calls,
+            tool_call_id=tool_call_id,
+            timestamp=db_message.timestamp
+        )
+        
+        # Update cache
+        if session_id in self._cache:
+            self._cache[session_id].messages.append(message)
+            self._cache[session_id].updated_at = db_session.updated_at
+            if not self._cache[session_id].title and db_session.title:
+                self._cache[session_id].title = db_session.title
+        
+        return message
+    
+    def clear_cache(self):
+        """Clear the in-memory cache (call at end of request)."""
+        self._cache.clear()
+
+
+# Global singleton session store
+_global_session_store = DatabaseSessionStore(llm_sessions_repository)
+
+
+def get_session_store() -> DatabaseSessionStore:
+    """Get the global session store singleton."""
+    return _global_session_store
 
 
 # ============================================================================
@@ -551,7 +664,7 @@ class LLMSearchManager:
         self._costs_manager = costs_manager
         self._search_manager = search_manager
         self._ws_client = workspace_client
-        self._session_store = SessionStore()
+        self._session_store = get_session_store()  # Use global singleton
         self._sql_validator = SQLValidator(max_row_limit=1000)
         
         logger.info(f"LLMSearchManager initialized (ws_client={workspace_client is not None}, semantic_models_manager={semantic_models_manager is not None})")
@@ -573,21 +686,15 @@ class LLMSearchManager:
     
     def list_sessions(self, user_id: str) -> List[SessionSummary]:
         """List conversation sessions for a user."""
-        return self._session_store.list_for_user(user_id)
+        return self._session_store.list_for_user(self._db, user_id)
     
     def delete_session(self, session_id: str, user_id: str) -> bool:
         """Delete a session if owned by user."""
-        session = self._session_store.get(session_id)
-        if session and session.user_id == user_id:
-            return self._session_store.delete(session_id)
-        return False
+        return self._session_store.delete(self._db, session_id, user_id)
     
     def get_session(self, session_id: str, user_id: str) -> Optional[ConversationSession]:
         """Get a session by ID if owned by user."""
-        session = self._session_store.get(session_id)
-        if session and session.user_id == user_id:
-            return session
-        return None
+        return self._session_store.get_for_user(self._db, session_id, user_id)
     
     async def chat(
         self,
@@ -624,13 +731,17 @@ class LLMSearchManager:
         
         # Get or create session
         if session_id:
-            session = self._session_store.get(session_id)
-            if not session or session.user_id != user_id:
-                session = self._session_store.create(user_id)
+            session = self._session_store.get_for_user(self._db, session_id, user_id)
+            if not session:
+                session = self._session_store.create(self._db, user_id)
         else:
-            session = self._session_store.create(user_id)
+            session = self._session_store.create(self._db, user_id)
         
-        # Add user message
+        # Add user message to database
+        self._session_store.add_message(
+            self._db, session.id, MessageRole.USER, content=user_message
+        )
+        # Also update in-memory session for LLM context
         session.add_user_message(user_message)
         
         # Process with LLM
@@ -639,8 +750,10 @@ class LLMSearchManager:
                 session
             )
             
-            # Add assistant response
-            assistant_msg = session.add_assistant_message(response_content)
+            # Add assistant response to database
+            assistant_msg = self._session_store.add_message(
+                self._db, session.id, MessageRole.ASSISTANT, content=response_content
+            )
             
             return ChatResponse(
                 session_id=session.id,
@@ -651,8 +764,9 @@ class LLMSearchManager:
             
         except Exception as e:
             logger.error(f"Error processing chat: {e}", exc_info=True)
-            error_msg = session.add_assistant_message(
-                f"I apologize, but I encountered an error processing your request: {str(e)}"
+            error_msg = self._session_store.add_message(
+                self._db, session.id, MessageRole.ASSISTANT,
+                content=f"I apologize, but I encountered an error processing your request: {str(e)}"
             )
             return ChatResponse(
                 session_id=session.id,
@@ -712,6 +826,12 @@ class LLMSearchManager:
                     )
                     for tc in assistant_message.tool_calls
                 ]
+                # Persist tool call message to database
+                self._session_store.add_message(
+                    self._db, session.id, MessageRole.ASSISTANT,
+                    content=None, tool_calls=tool_calls
+                )
+                # Also update in-memory session for LLM context
                 session.add_assistant_message(None, tool_calls)
                 
                 # Execute each tool call
@@ -751,7 +871,12 @@ class LLMSearchManager:
                             "error": str(e)
                         })
                     
-                    # Add tool result to session
+                    # Persist tool result to database
+                    self._session_store.add_message(
+                        self._db, session.id, MessageRole.TOOL,
+                        content=json.dumps(result), tool_call_id=tc.id
+                    )
+                    # Also update in-memory session for LLM context
                     session.add_tool_result(tc.id, result)
             else:
                 # No tool calls - return the response
