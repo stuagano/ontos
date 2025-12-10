@@ -53,6 +53,11 @@ class TagDb(Base):
     parent = relationship("TagDb", remote_side=[id], back_populates="children", foreign_keys=[parent_id])
     children = relationship("TagDb", back_populates="parent", foreign_keys=[parent_id])
 
+    @property
+    def namespace_name(self) -> str | None:
+        """Expose namespace name for Pydantic serialization."""
+        return self.namespace.name if self.namespace else None
+
     # Unique constraint for tag name within a namespace
     __table_args__ = (UniqueConstraint("namespace_id", "name", name="uq_tag_namespace_name"),)
 

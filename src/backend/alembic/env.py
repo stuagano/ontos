@@ -8,7 +8,7 @@ from alembic import context
 # --- Import application-specific components ---
 import os
 import sys
-from src.common.database import Base, get_db_url # Import Base and helper
+from src.common.database import Base, get_db_url, _oauth_token # Import Base, helper, and OAuth token
 from src.common.config import get_settings, Settings, init_config # Import settings loader, model, AND initializer
 # Add the project root to the Python path to allow imports from src.*
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -112,31 +112,42 @@ def run_migrations_online() -> None:
     target_schema = config.attributes.get('target_schema', None)
     
     if provided_engine is not None:
-        # Use the provided engine - it has OAuth token injection configured
-        # Create a new engine with AUTOCOMMIT isolation level to completely bypass
-        # transaction management issues with Lakebase. Each SQL statement commits immediately.
-        # This follows the Kasal pattern: create dedicated engine, use NullPool, dispose after.
-        from sqlalchemy import create_engine
+        # Create a COMPLETELY SEPARATE engine for Alembic with its own connection pool
+        # This prevents AUTOCOMMIT from affecting the main application's connections
+        import logging
+        from sqlalchemy import create_engine, event
         
-        # Get the URL from the provided engine and create a new AUTOCOMMIT engine
-        autocommit_engine = create_engine(
+        logger = logging.getLogger("alembic.env")
+        logger.info("env.py: Creating dedicated AUTOCOMMIT engine for migrations")
+        
+        # Create a new engine with AUTOCOMMIT and NullPool (no connection sharing)
+        alembic_engine = create_engine(
             provided_engine.url,
             isolation_level="AUTOCOMMIT",
-            poolclass=pool.NullPool,  # No pooling - fresh connection each time
+            poolclass=pool.NullPool,  # No pooling - completely isolated
         )
         
-        # Copy the OAuth token injection event listener if it exists on the original engine
-        # The do_connect event injects the OAuth token for Lakebase connections
-        for fn in provided_engine.dispatch.do_connect:
-            from sqlalchemy import event
-            event.listen(autocommit_engine, "do_connect", fn)
+        # Register OAuth token injection for Lakebase connections
+        # Access the token from the database module
+        @event.listens_for(alembic_engine, "do_connect")
+        def inject_oauth_token(dialect, conn_rec, cargs, cparams):
+            # Import here to get the current token value
+            from src.common.database import _oauth_token
+            if _oauth_token:
+                cparams["password"] = _oauth_token
+                logger.debug("env.py: Injected OAuth token into connection")
         
         try:
-            with autocommit_engine.connect() as connection:
+            logger.info(f"env.py: Connecting to database with target_schema={target_schema}")
+            with alembic_engine.connect() as connection:
+                logger.info("env.py: Connection established")
+                
                 # Set search_path (commits immediately in AUTOCOMMIT mode)
                 if target_schema:
+                    logger.info(f"env.py: Setting search_path to {target_schema}")
                     connection.execute(text(f'SET search_path TO "{target_schema}"'))
                 
+                logger.info("env.py: Configuring Alembic context")
                 context.configure(
                     connection=connection,
                     target_metadata=target_metadata,
@@ -146,10 +157,13 @@ def run_migrations_online() -> None:
                 )
                 
                 # Don't use begin_transaction() - AUTOCOMMIT handles each statement
+                logger.info("env.py: Running migrations (AUTOCOMMIT mode, no transaction wrapper)")
                 context.run_migrations()
+                logger.info("env.py: Migrations completed")
         finally:
-            # Dispose the engine after migrations (like Kasal pattern)
-            autocommit_engine.dispose()
+            # Dispose the dedicated engine - this is critical to not leak connections
+            alembic_engine.dispose()
+            logger.info("env.py: Dedicated Alembic engine disposed")
     else:
         # Standalone mode - create own engine (for CLI usage like `alembic upgrade head`)
         # Use a dictionary to pass the URL directly
