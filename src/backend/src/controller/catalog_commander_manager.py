@@ -1,28 +1,77 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 from databricks.sdk import WorkspaceClient
 from urllib.parse import quote
 
 from ..common.logging import get_logger
+from ..common.unity_catalog_utils import sanitize_uc_identifier
+from ..common.config import Settings
 
 logger = get_logger(__name__)
+
+# Constants for pagination
+DEFAULT_LIMIT = 100
+MAX_LIMIT = 1000
 
 class CatalogCommanderManager:
     """Manages catalog operations and queries."""
 
-    def __init__(self, sp_client: WorkspaceClient, obo_client: WorkspaceClient):
+    def __init__(
+        self,
+        sp_client: WorkspaceClient,
+        obo_client: WorkspaceClient,
+        settings: Optional[Settings] = None
+    ):
         """Initialize the catalog commander manager.
         
         Args:
             sp_client: Service principal workspace client for administrative operations
             obo_client: OBO workspace client for user-specific catalog browsing operations
+            settings: Application settings for warehouse configuration
         """
         logger.debug("Initializing CatalogCommanderManager...")
         self.sp_client = sp_client  # For administrative operations, jobs, etc.
         self.obo_client = obo_client  # For browsing catalogs with user permissions
         # Keep 'client' alias pointing to obo_client for backward compatibility
         self.client = obo_client
+        self.settings = settings
         logger.debug("CatalogCommanderManager initialized successfully with SP and OBO clients")
+
+    def _validate_and_parse_dataset_path(self, dataset_path: str) -> Tuple[str, str, str]:
+        """Validate and parse a dataset path into its components.
+        
+        This method provides SQL injection protection by sanitizing each
+        identifier component using Unity Catalog identifier validation rules.
+        
+        Args:
+            dataset_path: Full path to the dataset (catalog.schema.table)
+            
+        Returns:
+            Tuple of (catalog_name, schema_name, table_name) - all sanitized
+            
+        Raises:
+            ValueError: If the path format is invalid or contains invalid identifiers
+        """
+        if not dataset_path or not isinstance(dataset_path, str):
+            raise ValueError("dataset_path must be a non-empty string")
+        
+        parts = dataset_path.strip().split('.')
+        if len(parts) != 3:
+            raise ValueError(
+                f"dataset_path must be in the form catalog.schema.table, got: {dataset_path}"
+            )
+        
+        catalog_name, schema_name, table_name = parts
+        
+        # Sanitize each component to prevent SQL injection
+        try:
+            catalog_name = sanitize_uc_identifier(catalog_name)
+            schema_name = sanitize_uc_identifier(schema_name)
+            table_name = sanitize_uc_identifier(table_name)
+        except ValueError as e:
+            raise ValueError(f"Invalid dataset path component: {e}")
+        
+        return catalog_name, schema_name, table_name
 
     def list_catalogs(self) -> List[Dict[str, Any]]:
         """List all catalogs in the Databricks workspace.
@@ -157,28 +206,39 @@ class CatalogCommanderManager:
             logger.error(f"Error listing functions for {catalog_name}.{schema_name}: {e!s}", exc_info=True)
             raise
 
-    def get_dataset(self, dataset_path: str) -> Dict[str, Any]:
-        """Get dataset schema and comprehensive UC metadata using the shared WorkspaceClient.
+    def get_dataset(
+        self,
+        dataset_path: str,
+        limit: int = DEFAULT_LIMIT,
+        offset: int = 0
+    ) -> Dict[str, Any]:
+        """Get dataset schema, metadata, and paginated data rows.
 
-        This avoids requiring a SQL Warehouse. It returns detailed table and column metadata.
+        Uses Unity Catalog Tables API for metadata and Statement Execution API
+        for fetching actual data rows with pagination support.
 
         Args:
             dataset_path: Full path to the dataset (catalog.schema.table)
+            limit: Maximum number of rows to return (default: 100, max: 1000)
+            offset: Number of rows to skip for pagination (default: 0)
 
         Returns:
-            Dictionary containing detailed table info and enhanced schema with UC metadata
+            Dictionary containing table info, schema, paginated data, and row counts
         """
-        logger.info(f"Fetching dataset metadata for: {dataset_path}")
+        logger.info(f"Fetching dataset for: {dataset_path} (limit={limit}, offset={offset})")
+        
+        # Validate and sanitize the dataset path
+        catalog_name, schema_name, table_name = self._validate_and_parse_dataset_path(dataset_path)
+        safe_path = f"{catalog_name}.{schema_name}.{table_name}"
+        
+        # Clamp limit to valid range
+        limit = max(1, min(limit, MAX_LIMIT))
+        offset = max(0, offset)
+        
         try:
-            parts = dataset_path.split('.')
-            if len(parts) != 3:
-                raise ValueError("dataset_path must be in the form catalog.schema.table")
-            catalog_name, schema_name, table_name = parts
-
-            # Use Unity Catalog Tables API to get table details. Some SDK versions don't expose `.get`.
+            # Use Unity Catalog Tables API to get table details
             tbl = None
             try:
-                # Prefer SDK method if available
                 get_method = getattr(self.client.tables, 'get', None)
                 if callable(get_method):
                     tbl = get_method(catalog_name=catalog_name, schema_name=schema_name, name=table_name)
@@ -186,93 +246,174 @@ class CatalogCommanderManager:
                     raise AttributeError('tables.get not available')
             except Exception:
                 # Fallback to direct REST call via api_client
-                path = f"/api/2.1/unity-catalog/tables/{quote(dataset_path, safe='')}"
+                path = f"/api/2.1/unity-catalog/tables/{quote(safe_path, safe='')}"
                 tbl = self.client.api_client.do('GET', path)
 
             # Extract table-level metadata
-            table_info = {}
-            if isinstance(tbl, dict):
-                table_info = {
-                    'name': tbl.get('name', table_name),
-                    'catalog_name': tbl.get('catalog_name', catalog_name),
-                    'schema_name': tbl.get('schema_name', schema_name),
-                    'table_type': tbl.get('table_type', 'MANAGED'),
-                    'data_source_format': tbl.get('data_source_format', 'DELTA'),
-                    'storage_location': tbl.get('storage_location'),
-                    'owner': tbl.get('owner'),
-                    'comment': tbl.get('comment'),
-                    'created_at': tbl.get('created_at'),
-                    'updated_at': tbl.get('updated_at'),
-                    'properties': tbl.get('properties', {}),
-                }
-            else:
-                table_info = {
-                    'name': getattr(tbl, 'name', table_name),
-                    'catalog_name': getattr(tbl, 'catalog_name', catalog_name),
-                    'schema_name': getattr(tbl, 'schema_name', schema_name),
-                    'table_type': getattr(tbl, 'table_type', 'MANAGED'),
-                    'data_source_format': getattr(tbl, 'data_source_format', 'DELTA'),
-                    'storage_location': getattr(tbl, 'storage_location', None),
-                    'owner': getattr(tbl, 'owner', None),
-                    'comment': getattr(tbl, 'comment', None),
-                    'created_at': getattr(tbl, 'created_at', None),
-                    'updated_at': getattr(tbl, 'updated_at', None),
-                    'properties': getattr(tbl, 'properties', {}),
-                }
+            table_info = self._extract_table_info(tbl, catalog_name, schema_name, table_name)
 
             # Build enhanced schema with full UC metadata
-            schema: List[Dict[str, Any]] = []
-            columns_iter = None
-            if hasattr(tbl, 'columns'):
-                columns_iter = tbl.columns
-            elif isinstance(tbl, dict) and 'columns' in tbl:
-                columns_iter = tbl['columns']
+            schema = self._extract_schema(tbl)
 
-            if columns_iter:
-                for col in columns_iter:
-                    # Extract comprehensive column metadata
-                    if isinstance(col, dict):
-                        col_name = col.get('name') or col.get('column_name')
-                        col_type = col.get('type_text') or col.get('type_name') or col.get('data_type')
-                        nullable = col.get('nullable')
-                        comment = col.get('comment')
-                        partition_index = col.get('partition_index')
-                        type_name = col.get('type_name')  # Physical type
-                    else:
-                        col_name = getattr(col, 'name', None) or getattr(col, 'column_name', None)
-                        col_type = getattr(col, 'type_text', None) or getattr(col, 'type_name', None) or getattr(col, 'data_type', None)
-                        nullable = getattr(col, 'nullable', None)
-                        comment = getattr(col, 'comment', None)
-                        partition_index = getattr(col, 'partition_index', None)
-                        type_name = getattr(col, 'type_name', None)  # Physical type
-
-                    # Map common Databricks types to ODCS logical types
-                    logical_type = self._map_to_odcs_logical_type(col_type)
-
-                    column_meta = {
-                        'name': col_name,
-                        'type': col_type,  # Original UC type
-                        'physicalType': type_name or col_type,  # Physical type for ODCS
-                        'logicalType': logical_type,  # ODCS-compliant logical type
-                        'nullable': nullable,
-                        'comment': comment,
-                        'partitioned': partition_index is not None,
-                        'partitionKeyPosition': partition_index,
-                    }
-                    schema.append(column_meta)
+            # Fetch actual data rows using Statement Execution API
+            data = []
+            total_rows = 0
+            
+            if self.settings and self.settings.DATABRICKS_WAREHOUSE_ID:
+                warehouse_id = self.settings.DATABRICKS_WAREHOUSE_ID
+                logger.debug(f"Fetching data using warehouse: {warehouse_id}")
+                
+                try:
+                    # Execute paginated SELECT query
+                    # Use backticks to safely quote the table name
+                    select_sql = f"SELECT * FROM `{catalog_name}`.`{schema_name}`.`{table_name}` LIMIT {limit} OFFSET {offset}"
+                    logger.debug(f"Executing SQL: {select_sql}")
+                    
+                    result = self.client.statement_execution.execute_statement(
+                        statement=select_sql,
+                        warehouse_id=warehouse_id,
+                        wait_timeout="30s"
+                    )
+                    
+                    # Check status
+                    if result.status and result.status.state:
+                        state = str(result.status.state)
+                        if "FAILED" in state or "CANCELED" in state:
+                            error_msg = result.status.error.message if result.status.error else "Query failed"
+                            logger.warning(f"Query failed: {error_msg}")
+                        else:
+                            # Extract column names from manifest
+                            column_names = []
+                            if result.manifest and result.manifest.schema and result.manifest.schema.columns:
+                                column_names = [col.name for col in result.manifest.schema.columns]
+                            
+                            # Extract data rows and convert to dictionaries
+                            if result.result and result.result.data_array:
+                                for row in result.result.data_array:
+                                    if column_names:
+                                        row_dict = dict(zip(column_names, row))
+                                    else:
+                                        row_dict = {f"col_{i}": v for i, v in enumerate(row)}
+                                    data.append(row_dict)
+                            
+                            logger.info(f"Retrieved {len(data)} rows from {safe_path}")
+                    
+                    # Get total row count (use a separate COUNT query)
+                    count_sql = f"SELECT COUNT(*) as cnt FROM `{catalog_name}`.`{schema_name}`.`{table_name}`"
+                    count_result = self.client.statement_execution.execute_statement(
+                        statement=count_sql,
+                        warehouse_id=warehouse_id,
+                        wait_timeout="30s"
+                    )
+                    
+                    if (count_result.status and "SUCCEEDED" in str(count_result.status.state) and
+                        count_result.result and count_result.result.data_array):
+                        total_rows = int(count_result.result.data_array[0][0] or 0)
+                        logger.debug(f"Total row count: {total_rows}")
+                        
+                except Exception as e:
+                    logger.warning(f"Failed to fetch data via Statement Execution API: {e}")
+                    # Continue without data - metadata is still useful
+            else:
+                logger.warning("No warehouse configured - returning metadata only without data rows")
 
             result: Dict[str, Any] = {
                 'schema': schema,
                 'table_info': table_info,
-                'data': [],
-                'total_rows': 0,
+                'data': data,
+                'total_rows': total_rows,
+                'limit': limit,
+                'offset': offset,
             }
 
-            logger.info(f"Successfully retrieved metadata with {len(schema)} columns for {dataset_path}")
+            logger.info(f"Successfully retrieved dataset with {len(schema)} columns and {len(data)} rows for {safe_path}")
             return result
-        except Exception as e:
-            logger.error(f"Error fetching dataset metadata for {dataset_path}: {e!s}", exc_info=True)
+        except ValueError as e:
+            # Re-raise validation errors as-is
             raise
+        except Exception as e:
+            logger.error(f"Error fetching dataset for {dataset_path}: {e!s}", exc_info=True)
+            raise
+
+    def _extract_table_info(
+        self,
+        tbl: Any,
+        catalog_name: str,
+        schema_name: str,
+        table_name: str
+    ) -> Dict[str, Any]:
+        """Extract table-level metadata from a table object or dict."""
+        if isinstance(tbl, dict):
+            return {
+                'name': tbl.get('name', table_name),
+                'catalog_name': tbl.get('catalog_name', catalog_name),
+                'schema_name': tbl.get('schema_name', schema_name),
+                'table_type': tbl.get('table_type', 'MANAGED'),
+                'data_source_format': tbl.get('data_source_format', 'DELTA'),
+                'storage_location': tbl.get('storage_location'),
+                'owner': tbl.get('owner'),
+                'comment': tbl.get('comment'),
+                'created_at': tbl.get('created_at'),
+                'updated_at': tbl.get('updated_at'),
+                'properties': tbl.get('properties', {}),
+            }
+        else:
+            return {
+                'name': getattr(tbl, 'name', table_name),
+                'catalog_name': getattr(tbl, 'catalog_name', catalog_name),
+                'schema_name': getattr(tbl, 'schema_name', schema_name),
+                'table_type': getattr(tbl, 'table_type', 'MANAGED'),
+                'data_source_format': getattr(tbl, 'data_source_format', 'DELTA'),
+                'storage_location': getattr(tbl, 'storage_location', None),
+                'owner': getattr(tbl, 'owner', None),
+                'comment': getattr(tbl, 'comment', None),
+                'created_at': getattr(tbl, 'created_at', None),
+                'updated_at': getattr(tbl, 'updated_at', None),
+                'properties': getattr(tbl, 'properties', {}),
+            }
+
+    def _extract_schema(self, tbl: Any) -> List[Dict[str, Any]]:
+        """Extract column schema information from a table object or dict."""
+        schema: List[Dict[str, Any]] = []
+        columns_iter = None
+        
+        if hasattr(tbl, 'columns'):
+            columns_iter = tbl.columns
+        elif isinstance(tbl, dict) and 'columns' in tbl:
+            columns_iter = tbl['columns']
+
+        if columns_iter:
+            for col in columns_iter:
+                if isinstance(col, dict):
+                    col_name = col.get('name') or col.get('column_name')
+                    col_type = col.get('type_text') or col.get('type_name') or col.get('data_type')
+                    nullable = col.get('nullable')
+                    comment = col.get('comment')
+                    partition_index = col.get('partition_index')
+                    type_name = col.get('type_name')
+                else:
+                    col_name = getattr(col, 'name', None) or getattr(col, 'column_name', None)
+                    col_type = getattr(col, 'type_text', None) or getattr(col, 'type_name', None) or getattr(col, 'data_type', None)
+                    nullable = getattr(col, 'nullable', None)
+                    comment = getattr(col, 'comment', None)
+                    partition_index = getattr(col, 'partition_index', None)
+                    type_name = getattr(col, 'type_name', None)
+
+                logical_type = self._map_to_odcs_logical_type(col_type)
+
+                column_meta = {
+                    'name': col_name,
+                    'type': col_type,
+                    'physicalType': type_name or col_type,
+                    'logicalType': logical_type,
+                    'nullable': nullable,
+                    'comment': comment,
+                    'partitioned': partition_index is not None,
+                    'partitionKeyPosition': partition_index,
+                }
+                schema.append(column_meta)
+        
+        return schema
 
     def _map_to_odcs_logical_type(self, databricks_type: str) -> str:
         """Map Databricks data types to ODCS v3.0.2 logical types.

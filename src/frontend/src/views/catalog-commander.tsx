@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { TreeView } from '@/components/ui/tree-view';
 import {
   Folder,
@@ -18,7 +18,11 @@ import {
   PanelRightOpen,
   Copy,
   GitCompare,
-  RefreshCw
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,7 +65,13 @@ interface DatasetContent {
   schema: Array<{ name: string; type: string; nullable: boolean }>;
   data: any[];
   total_rows: number;
+  limit: number;
+  offset: number;
 }
+
+// Pagination constants
+const DEFAULT_PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 interface Estate {
   id: string;
@@ -87,6 +97,10 @@ const CatalogCommander: React.FC = () => {
   const [selectedDataset, setSelectedDataset] = useState<string | null>(null);
   const [datasetContent, setDatasetContent] = useState<DatasetContent | null>(null);
   const [loadingData, setLoadingData] = useState(false);
+  
+  // Pagination state for data preview
+  const [dataPageSize, setDataPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [dataCurrentPage, setDataCurrentPage] = useState(1);
   const [selectedObjectInfo, setSelectedObjectInfo] = useState<any>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set());
@@ -110,13 +124,12 @@ const CatalogCommander: React.FC = () => {
   const setStaticSegments = useBreadcrumbStore((state) => state.setStaticSegments);
   const setDynamicTitle = useBreadcrumbStore((state) => state.setDynamicTitle);
 
-  const handleViewDataset = async (path: string) => {
-    setSelectedDataset(path);
+  const fetchDatasetPage = useCallback(async (path: string, limit: number, offset: number) => {
     setLoadingData(true);
-    setViewDialogOpen(true);
-
     try {
-      const response = await fetch(`/api/catalogs/dataset/${encodeURIComponent(path)}`);
+      const response = await fetch(
+        `/api/catalogs/dataset/${encodeURIComponent(path)}?limit=${limit}&offset=${offset}`
+      );
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -128,6 +141,28 @@ const CatalogCommander: React.FC = () => {
     } finally {
       setLoadingData(false);
     }
+  }, []);
+
+  const handleViewDataset = async (path: string) => {
+    setSelectedDataset(path);
+    setDataCurrentPage(1);
+    setViewDialogOpen(true);
+    await fetchDatasetPage(path, dataPageSize, 0);
+  };
+
+  const handleDataPageChange = (newPage: number) => {
+    if (!selectedDataset) return;
+    setDataCurrentPage(newPage);
+    const offset = (newPage - 1) * dataPageSize;
+    fetchDatasetPage(selectedDataset, dataPageSize, offset);
+  };
+
+  const handleDataPageSizeChange = (newSize: string) => {
+    if (!selectedDataset) return;
+    const size = parseInt(newSize, 10);
+    setDataPageSize(size);
+    setDataCurrentPage(1);
+    fetchDatasetPage(selectedDataset, size, 0);
   };
 
   const handleOperation = (operation: string) => {
@@ -774,14 +809,112 @@ const CatalogCommander: React.FC = () => {
               <Loader2 className="animate-spin h-8 w-8 text-blue-500" />
             </div>
           ) : datasetContent ? (
-            <div className="mt-4 flex-1 overflow-auto h-full">
-              <DataTable
-                data={datasetContent.data}
-                columns={datasetContent.schema.map(col => ({
-                  accessorKey: col.name,
-                  header: `${col.name} (${col.type})`,
-                }))}
-              />
+            <div className="mt-4 flex-1 flex flex-col overflow-hidden h-full">
+              {/* Data Table */}
+              <div className="flex-1 overflow-auto min-h-0">
+                <DataTable
+                  data={datasetContent.data}
+                  columns={datasetContent.schema.map(col => ({
+                    accessorKey: col.name,
+                    header: `${col.name} (${col.type})`,
+                  }))}
+                />
+              </div>
+              
+              {/* Pagination Controls */}
+              <div className="flex items-center justify-between border-t pt-4 mt-4 flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">
+                    {datasetContent.data.length > 0 ? (
+                      <>
+                        Showing {((dataCurrentPage - 1) * dataPageSize) + 1} to{' '}
+                        {Math.min(dataCurrentPage * dataPageSize, datasetContent.total_rows)} of{' '}
+                        {datasetContent.total_rows.toLocaleString()} rows
+                      </>
+                    ) : (
+                      'No rows to display'
+                    )}
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  {/* Rows per page selector */}
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm text-muted-foreground">Rows per page:</Label>
+                    <Select
+                      value={dataPageSize.toString()}
+                      onValueChange={handleDataPageSizeChange}
+                    >
+                      <SelectTrigger className="h-8 w-[70px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PAGE_SIZE_OPTIONS.map(size => (
+                          <SelectItem key={size} value={size.toString()}>
+                            {size}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Page navigation */}
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleDataPageChange(1)}
+                      disabled={dataCurrentPage === 1 || loadingData}
+                      title="First page"
+                    >
+                      <ChevronsLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleDataPageChange(dataCurrentPage - 1)}
+                      disabled={dataCurrentPage === 1 || loadingData}
+                      title="Previous page"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    
+                    <span className="text-sm px-2 min-w-[80px] text-center">
+                      Page {dataCurrentPage} of{' '}
+                      {Math.ceil(datasetContent.total_rows / dataPageSize) || 1}
+                    </span>
+                    
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleDataPageChange(dataCurrentPage + 1)}
+                      disabled={
+                        dataCurrentPage >= Math.ceil(datasetContent.total_rows / dataPageSize) ||
+                        loadingData
+                      }
+                      title="Next page"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleDataPageChange(Math.ceil(datasetContent.total_rows / dataPageSize))}
+                      disabled={
+                        dataCurrentPage >= Math.ceil(datasetContent.total_rows / dataPageSize) ||
+                        loadingData
+                      }
+                      title="Last page"
+                    >
+                      <ChevronsRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">No data available</p>

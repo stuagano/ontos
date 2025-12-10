@@ -1,7 +1,9 @@
 from databricks.sdk import WorkspaceClient
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from src.common.workspace_client import get_obo_workspace_client, get_workspace_client_dependency
+from src.common.dependencies import SettingsDep
+from src.common.config import Settings
 from src.controller.catalog_commander_manager import CatalogCommanderManager
 # Import permission checker and feature level
 from src.common.authorization import PermissionChecker
@@ -38,7 +40,9 @@ def get_catalog_manager(
     Returns:
         Configured catalog commander manager instance with both clients
     """
-    return CatalogCommanderManager(sp_client=sp_client, obo_client=obo_client)
+    # Get settings from app state for warehouse configuration
+    settings = getattr(request.app.state, 'settings', None)
+    return CatalogCommanderManager(sp_client=sp_client, obo_client=obo_client, settings=settings)
 
 # --- Read-Only Routes (Require READ_ONLY or higher) ---
 
@@ -131,14 +135,21 @@ async def list_functions(
 @router.get('/catalogs/dataset/{dataset_path:path}', dependencies=[Depends(PermissionChecker(CATALOG_COMMANDER_FEATURE_ID, FeatureAccessLevel.READ_ONLY))])
 async def get_dataset(
     dataset_path: str,
+    limit: int = Query(default=100, ge=1, le=1000, description="Maximum number of rows to return"),
+    offset: int = Query(default=0, ge=0, description="Number of rows to skip for pagination"),
     catalog_manager: CatalogCommanderManager = Depends(get_catalog_manager)
 ):
-    """Get dataset content and schema."""
+    """Get dataset content and schema with paginated data rows."""
     try:
-        logger.info(f"Fetching dataset: {dataset_path}")
-        dataset = catalog_manager.get_dataset(dataset_path)
+        logger.info(f"Fetching dataset: {dataset_path} (limit={limit}, offset={offset})")
+        dataset = catalog_manager.get_dataset(dataset_path, limit=limit, offset=offset)
         logger.info(f"Successfully fetched dataset {dataset_path}")
         return dataset
+    except ValueError as e:
+        # Validation errors (invalid path, SQL injection attempt)
+        error_msg = f"Invalid dataset path: {e!s}"
+        logger.warning(error_msg)
+        raise HTTPException(status_code=400, detail=error_msg)
     except Exception as e:
         error_msg = f"Failed to fetch dataset {dataset_path}: {e!s}"
         logger.error(error_msg, exc_info=True)
