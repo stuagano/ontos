@@ -113,23 +113,43 @@ def run_migrations_online() -> None:
     
     if provided_engine is not None:
         # Use the provided engine - it has OAuth token injection configured
-        # Alembic creates and fully manages its own connection and transaction
-        # This avoids all transaction state conflicts that caused hangs with Lakebase
-        with provided_engine.connect() as connection:
-            # Set search_path and commit BEFORE starting migration transaction
-            # This ensures clean transaction state when begin_transaction() runs
-            if target_schema:
-                connection.execute(text(f'SET search_path TO "{target_schema}"'))
-                connection.commit()  # Commit SET so it's not part of migration transaction
-            
-            context.configure(
-                connection=connection,
-                target_metadata=target_metadata,
-                include_object=include_object
-            )
-            
-            with context.begin_transaction():
+        # Create a new engine with AUTOCOMMIT isolation level to completely bypass
+        # transaction management issues with Lakebase. Each SQL statement commits immediately.
+        # This follows the Kasal pattern: create dedicated engine, use NullPool, dispose after.
+        from sqlalchemy import create_engine
+        
+        # Get the URL from the provided engine and create a new AUTOCOMMIT engine
+        autocommit_engine = create_engine(
+            provided_engine.url,
+            isolation_level="AUTOCOMMIT",
+            poolclass=pool.NullPool,  # No pooling - fresh connection each time
+        )
+        
+        # Copy the OAuth token injection event listener if it exists on the original engine
+        # The do_connect event injects the OAuth token for Lakebase connections
+        for fn in provided_engine.dispatch.do_connect:
+            from sqlalchemy import event
+            event.listen(autocommit_engine, "do_connect", fn)
+        
+        try:
+            with autocommit_engine.connect() as connection:
+                # Set search_path (commits immediately in AUTOCOMMIT mode)
+                if target_schema:
+                    connection.execute(text(f'SET search_path TO "{target_schema}"'))
+                
+                context.configure(
+                    connection=connection,
+                    target_metadata=target_metadata,
+                    include_object=include_object,
+                    transactional_ddl=False,  # Tell Alembic not to use transactions
+                    transaction_per_migration=False,  # No per-migration transactions
+                )
+                
+                # Don't use begin_transaction() - AUTOCOMMIT handles each statement
                 context.run_migrations()
+        finally:
+            # Dispose the engine after migrations (like Kasal pattern)
+            autocommit_engine.dispose()
     else:
         # Standalone mode - create own engine (for CLI usage like `alembic upgrade head`)
         # Use a dictionary to pass the URL directly
