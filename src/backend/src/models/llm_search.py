@@ -76,6 +76,16 @@ class ToolName(str, Enum):
     ADD_SEMANTIC_LINK = "add_semantic_link"
     LIST_SEMANTIC_LINKS = "list_semantic_links"
     REMOVE_SEMANTIC_LINK = "remove_semantic_link"
+    
+    # Tags (CRUD + entity assignment)
+    SEARCH_TAGS = "search_tags"
+    GET_TAG = "get_tag"
+    CREATE_TAG = "create_tag"
+    UPDATE_TAG = "update_tag"
+    DELETE_TAG = "delete_tag"
+    LIST_ENTITY_TAGS = "list_entity_tags"
+    ASSIGN_TAG_TO_ENTITY = "assign_tag_to_entity"
+    REMOVE_TAG_FROM_ENTITY = "remove_tag_from_entity"
 
 
 # ============================================================================

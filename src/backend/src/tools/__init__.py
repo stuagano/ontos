@@ -104,6 +104,18 @@ from src.tools.analytics import (
 # Costs tools
 from src.tools.costs import GetDataProductCostsTool
 
+# Tags tools
+from src.tools.tags import (
+    SearchTagsTool,
+    GetTagTool,
+    CreateTagTool,
+    UpdateTagTool,
+    DeleteTagTool,
+    ListEntityTagsTool,
+    AssignTagToEntityTool,
+    RemoveTagFromEntityTool
+)
+
 __all__ = [
     # Base classes
     "BaseTool",
@@ -162,4 +174,14 @@ __all__ = [
     
     # Costs tools
     "GetDataProductCostsTool",
+    
+    # Tags tools
+    "SearchTagsTool",
+    "GetTagTool",
+    "CreateTagTool",
+    "UpdateTagTool",
+    "DeleteTagTool",
+    "ListEntityTagsTool",
+    "AssignTagToEntityTool",
+    "RemoveTagFromEntityTool",
 ]
