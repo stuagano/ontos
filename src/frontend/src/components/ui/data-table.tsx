@@ -54,6 +54,8 @@ interface DataTableProps<TData, TValue> {
   defaultSortColumn?: string; // Column ID to sort by default (auto-detected if not provided)
   defaultSortDirection?: 'asc' | 'desc'; // Default sort direction (default: 'asc')
   isLoading?: boolean; // Optional: Show loading state
+  rowSelection?: RowSelectionState; // Optional: Controlled row selection state
+  onRowSelectionChange?: (rowSelection: RowSelectionState) => void; // Optional: Callback when selection changes
 }
 
 export function DataTable<TData, TValue>({
@@ -67,6 +69,8 @@ export function DataTable<TData, TValue>({
   defaultSortColumn,
   defaultSortDirection = 'asc',
   isLoading = false,
+  rowSelection: controlledRowSelection,
+  onRowSelectionChange,
 }: DataTableProps<TData, TValue>) {
   const { t } = useTranslation('data-table');
   
@@ -117,8 +121,20 @@ export function DataTable<TData, TValue>({
   const [sorting, setSorting] = React.useState<SortingState>(getInitialSorting);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+  const [internalRowSelection, setInternalRowSelection] = React.useState<RowSelectionState>({});
   const [globalFilter, setGlobalFilter] = React.useState("");
+
+  // Use controlled or internal row selection state
+  const isControlled = controlledRowSelection !== undefined;
+  const rowSelection = isControlled ? controlledRowSelection : internalRowSelection;
+  const setRowSelection = React.useCallback((updater: RowSelectionState | ((prev: RowSelectionState) => RowSelectionState)) => {
+    const newValue = typeof updater === 'function' ? updater(rowSelection) : updater;
+    if (isControlled && onRowSelectionChange) {
+      onRowSelectionChange(newValue);
+    } else {
+      setInternalRowSelection(newValue);
+    }
+  }, [isControlled, onRowSelectionChange, rowSelection]);
 
   // Persist sorting to localStorage whenever it changes
   React.useEffect(() => {

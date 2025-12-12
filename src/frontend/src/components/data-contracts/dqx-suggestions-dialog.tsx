@@ -1,11 +1,11 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DataTable } from '@/components/ui/data-table'
-import { ColumnDef } from '@tanstack/react-table'
+import { ColumnDef, RowSelectionState } from '@tanstack/react-table'
 import { useToast } from '@/hooks/use-toast'
 import { CheckCircle2, XCircle, Loader2, Sparkles } from 'lucide-react'
 import type { SuggestedQualityCheck, DataContract } from '@/types/data-contract'
@@ -31,9 +31,14 @@ export default function DqxSuggestionsDialog({
   const { toast } = useToast()
   const [suggestions, setSuggestions] = useState<SuggestedQualityCheck[]>([])
   const [loading, setLoading] = useState(false)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [isVersionDialogOpen, setIsVersionDialogOpen] = useState(false)
   const [pendingAction, setPendingAction] = useState<'accept' | 'reject' | null>(null)
+
+  // Compute selected IDs from row selection state
+  const selectedIds = useMemo(() => {
+    return new Set(Object.keys(rowSelection).filter(id => rowSelection[id]))
+  }, [rowSelection])
 
   // Group suggestions by schema
   const suggestionsBySchema = useMemo(() => {
@@ -70,29 +75,19 @@ export default function DqxSuggestionsDialog({
     }
   }
 
-  const handleSelectAll = (schemaName?: string) => {
-    if (schemaName) {
-      const schemaSuggestions = suggestionsBySchema[schemaName] || []
-      const schemaIds = new Set(schemaSuggestions.map(s => s.id))
-      const allSelected = schemaSuggestions.every(s => selectedIds.has(s.id))
-      
-      const newSet = new Set(selectedIds)
-      if (allSelected) {
-        schemaIds.forEach(id => newSet.delete(id))
-      } else {
-        schemaIds.forEach(id => newSet.add(id))
-      }
-      setSelectedIds(newSet)
+  const handleSelectAll = useCallback(() => {
+    // Select/deselect all pending suggestions
+    const pendingIds = suggestions.filter(s => s.status === 'pending').map(s => s.id)
+    const allSelected = pendingIds.length > 0 && pendingIds.every(id => rowSelection[id])
+    
+    if (allSelected) {
+      setRowSelection({})
     } else {
-      // Select all pending suggestions
-      const pendingIds = suggestions.filter(s => s.status === 'pending').map(s => s.id)
-      if (selectedIds.size === pendingIds.length) {
-        setSelectedIds(new Set())
-      } else {
-        setSelectedIds(new Set(pendingIds))
-      }
+      const newSelection: RowSelectionState = {}
+      pendingIds.forEach(id => { newSelection[id] = true })
+      setRowSelection(newSelection)
     }
-  }
+  }, [suggestions, rowSelection])
 
   const handleAccept = () => {
     if (selectedIds.size === 0) return
@@ -132,7 +127,7 @@ export default function DqxSuggestionsDialog({
         description: `Accepted ${data.accepted_count} quality check ${data.accepted_count === 1 ? 'suggestion' : 'suggestions'}` 
       })
       
-      setSelectedIds(new Set())
+      setRowSelection({})
       onSuccess()
       onOpenChange(false)
     } catch (e) {
@@ -157,7 +152,7 @@ export default function DqxSuggestionsDialog({
       const data = await res.json()
       toast({ title: 'Rejected', description: `Rejected ${data.rejected_count} ${data.rejected_count === 1 ? 'suggestion' : 'suggestions'}` })
       
-      setSelectedIds(new Set())
+      setRowSelection({})
       fetchSuggestions()
     } catch (e) {
       toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed to reject suggestions', variant: 'destructive' })
@@ -274,6 +269,8 @@ export default function DqxSuggestionsDialog({
                     <DataTable
                       columns={createColumns()}
                       data={suggestionsBySchema[schemaNames[0]]}
+                      rowSelection={rowSelection}
+                      onRowSelectionChange={setRowSelection}
                     />
                   </div>
                 ) : (
@@ -294,6 +291,8 @@ export default function DqxSuggestionsDialog({
                         <DataTable
                           columns={createColumns()}
                           data={suggestionsBySchema[schemaName]}
+                          rowSelection={rowSelection}
+                          onRowSelectionChange={setRowSelection}
                         />
                       </TabsContent>
                     ))}
