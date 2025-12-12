@@ -10,7 +10,7 @@ import LLMSearch from '@/components/search/llm-search';
 
 
 export default function SearchView() {
-  const [mode, setMode] = useState<'app' | 'kg' | 'concepts' | 'llm'>('app');
+  const [mode, setMode] = useState<'app' | 'kg' | 'concepts' | 'llm'>('llm');
   const location = useLocation();
   const setStaticSegments = useBreadcrumbStore((state) => state.setStaticSegments);
   const setDynamicTitle = useBreadcrumbStore((state) => state.setDynamicTitle);
@@ -87,11 +87,15 @@ export default function SearchView() {
       </h1>
       <Tabs value={mode} onValueChange={(v) => handleModeChange(v as 'app' | 'kg' | 'concepts' | 'llm')}>
         <TabsList>
+          <TabsTrigger value="llm">Ask Ontos</TabsTrigger>
           <TabsTrigger value="app">App Search</TabsTrigger>
           <TabsTrigger value="kg">Knowledge Graph</TabsTrigger>
           <TabsTrigger value="concepts">Concepts</TabsTrigger>
-          <TabsTrigger value="llm">Ask Ontos</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="llm">
+          <LLMSearch />
+        </TabsContent>
 
         <TabsContent value="app">
           <AppSearch initialQuery={appQuery} />
@@ -112,10 +116,6 @@ export default function SearchView() {
             initialQuery={conceptsQuery}
             initialSelectedConcept={initialConcept}
           />
-        </TabsContent>
-
-        <TabsContent value="llm">
-          <LLMSearch />
         </TabsContent>
       </Tabs>
     </div>
