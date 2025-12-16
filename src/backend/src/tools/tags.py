@@ -151,11 +151,20 @@ class CreateTagTool(BaseTool):
     """Create a new tag."""
     
     name = "create_tag"
-    description = "Create a new tag. Tags are organized in namespaces and can have hierarchical parent-child relationships."
+    description = (
+        "Create a new tag. Tags are organized in namespaces using the format 'namespace/tag_name'. "
+        "For example, 'import/healthcare' creates tag 'healthcare' in namespace 'import'. "
+        "If no slash is present in the name (e.g., just 'pii'), the tag is created in the 'default' namespace. "
+        "The namespace is automatically created if it doesn't exist."
+    )
     parameters = {
         "name": {
             "type": "string",
-            "description": "Name for the tag (e.g., 'pii', 'customer-data', 'sensitive')"
+            "description": (
+                "Tag name, optionally with namespace prefix using slash separator. "
+                "Examples: 'import/healthcare' (namespace='import', tag='healthcare'), "
+                "'pii' (uses default namespace), 'compliance/gdpr' (namespace='compliance', tag='gdpr')"
+            )
         },
         "description": {
             "type": "string",
@@ -163,7 +172,7 @@ class CreateTagTool(BaseTool):
         },
         "namespace_name": {
             "type": "string",
-            "description": "Namespace for the tag (default: 'default'). Use namespaces to organize related tags."
+            "description": "Explicit namespace for the tag (overrides namespace parsed from name). Defaults to 'default' if not specified and name has no slash."
         },
         "parent_id": {
             "type": "string",
@@ -185,14 +194,35 @@ class CreateTagTool(BaseTool):
         
         try:
             from src.controller.tags_manager import TagsManager
-            from src.models.tags import TagCreate
+            from src.models.tags import TagCreate, TagNamespaceCreate, TAG_NAMESPACE_SEPARATOR
             
             tags_manager = TagsManager()
             
+            # Parse FQN format: if name contains '/' and no explicit namespace_name provided,
+            # extract namespace from the name (e.g., 'import/healthcare' -> namespace='import', name='healthcare')
+            parsed_namespace = namespace_name
+            parsed_name = name
+            
+            if TAG_NAMESPACE_SEPARATOR in name and not namespace_name:
+                parts = name.split(TAG_NAMESPACE_SEPARATOR, 1)  # Split on first slash only
+                parsed_namespace = parts[0].strip()
+                parsed_name = parts[1].strip()
+                logger.info(f"[create_tag] Parsed FQN: namespace='{parsed_namespace}', name='{parsed_name}'")
+            
+            # Use 'default' namespace if still not set
+            final_namespace = parsed_namespace or "default"
+            
+            # Auto-create namespace if it doesn't exist
+            existing_ns = tags_manager.get_namespace_by_name(ctx.db, name=final_namespace)
+            if not existing_ns and final_namespace != "default":
+                logger.info(f"[create_tag] Auto-creating namespace '{final_namespace}'")
+                ns_create = TagNamespaceCreate(name=final_namespace, description=f"Auto-created namespace for {final_namespace} tags")
+                tags_manager.create_namespace(ctx.db, namespace_in=ns_create, user_email="llm-assistant")
+            
             tag_create = TagCreate(
-                name=name,
+                name=parsed_name,
                 description=description or "",
-                namespace_name=namespace_name or "default",
+                namespace_name=final_namespace,
                 parent_id=UUID(parent_id) if parent_id else None
             )
             
@@ -202,13 +232,14 @@ class CreateTagTool(BaseTool):
                 user_email="llm-assistant"
             )
             
-            logger.info(f"[create_tag] SUCCESS: Created tag id={created.id}, name={created.name}")
+            logger.info(f"[create_tag] SUCCESS: Created tag id={created.id}, name={created.name}, fqn={created.fully_qualified_name}")
             return ToolResult(
                 success=True,
                 data={
                     "success": True,
                     "tag_id": str(created.id),
                     "name": created.name,
+                    "namespace_name": final_namespace,
                     "fully_qualified_name": created.fully_qualified_name,
                     "message": f"Tag '{created.fully_qualified_name}' created successfully."
                 }

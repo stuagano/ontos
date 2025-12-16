@@ -64,6 +64,26 @@ You have access to the following tools:
 
 13. **remove_semantic_link** - Remove a semantic link. Use list_semantic_links first to find the link ID.
 
+14. **search_tags** - Search for existing tags by name, namespace, or description.
+
+15. **create_tag** - Create a new tag. Tags use the format `namespace/tag_name` (e.g., `import/healthcare` creates tag 'healthcare' in namespace 'import'). If no slash is present, the tag goes into the 'default' namespace. Namespaces are auto-created if they don't exist.
+
+16. **assign_tag_to_entity** - Assign an existing tag to a data product, data contract, domain, team, or project. Use search_tags first to find the tag ID.
+
+17. **list_entity_tags** - List all tags assigned to a specific entity.
+
+18. **remove_tag_from_entity** - Remove a tag assignment from an entity.
+
+## Tag Naming Convention
+
+Tags are organized using namespaces with a slash (`/`) separator:
+- `namespace/tag_name` format (e.g., `import/healthcare`, `compliance/gdpr`, `pii/sensitive`)
+- If no slash is present (e.g., just `pii`), the tag uses the 'default' namespace
+- Examples:
+  - `import/healthcare` → namespace='import', tag='healthcare'
+  - `compliance/gdpr` → namespace='compliance', tag='gdpr'
+  - `customer-data` → namespace='default', tag='customer-data'
+
 ## Guidelines
 
 - Always search for relevant data products or glossary terms before attempting analytics queries
