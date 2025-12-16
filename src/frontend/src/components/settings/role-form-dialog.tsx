@@ -68,6 +68,29 @@ const RoleFormDialog: React.FC<RoleFormDialogProps> = ({
     const isEditMode = !!initialRole;
     const [formError, setFormError] = useState<string | null>(null);
 
+    // Helper to normalize deployment policy from backend (handles nulls)
+    const normalizeDeploymentPolicy = (policy: any) => {
+        if (!policy) return null;
+        return {
+            allowed_catalogs: Array.isArray(policy.allowed_catalogs) ? policy.allowed_catalogs : [],
+            allowed_schemas: Array.isArray(policy.allowed_schemas) ? policy.allowed_schemas : [],
+            default_catalog: policy.default_catalog || '',
+            default_schema: policy.default_schema || '',
+            require_approval: Boolean(policy.require_approval),
+            can_approve_deployments: Boolean(policy.can_approve_deployments),
+        };
+    };
+
+    // Helper to normalize approval privileges (ensure all values are booleans)
+    const normalizeApprovalPrivileges = (privileges: any) => {
+        if (!privileges) return {};
+        const normalized: Record<string, boolean> = {};
+        Object.entries(privileges).forEach(([key, value]) => {
+            normalized[key] = Boolean(value);
+        });
+        return normalized;
+    };
+
     const defaultValues: AppRole = {
         id: initialRole?.id || '',
         name: initialRole?.name || '',
@@ -75,8 +98,8 @@ const RoleFormDialog: React.FC<RoleFormDialogProps> = ({
         assigned_groups: initialRole?.assigned_groups || [],
         feature_permissions: initialRole?.feature_permissions || getDefaultPermissions(featuresConfig),
         home_sections: initialRole?.home_sections || [],
-        approval_privileges: initialRole?.approval_privileges || {},
-        deployment_policy: initialRole?.deployment_policy || null,
+        approval_privileges: normalizeApprovalPrivileges(initialRole?.approval_privileges),
+        deployment_policy: normalizeDeploymentPolicy(initialRole?.deployment_policy),
     } as AppRole;
 
     const {
@@ -90,7 +113,16 @@ const RoleFormDialog: React.FC<RoleFormDialogProps> = ({
     // Reset form when initialRole or isOpen changes
     useEffect(() => {
         if (isOpen) {
-            const baseRoleData = initialRole || { 
+            const baseRoleData = initialRole ? {
+                id: initialRole.id || '',
+                name: initialRole.name || '',
+                description: initialRole.description || '',
+                assigned_groups: initialRole.assigned_groups || [],
+                feature_permissions: initialRole.feature_permissions || getDefaultPermissions(featuresConfig),
+                home_sections: initialRole.home_sections || [],
+                approval_privileges: normalizeApprovalPrivileges(initialRole.approval_privileges),
+                deployment_policy: normalizeDeploymentPolicy(initialRole.deployment_policy),
+            } : { 
                 id: '', 
                 name: '', 
                 description: '', 
@@ -161,10 +193,37 @@ const RoleFormDialog: React.FC<RoleFormDialogProps> = ({
                 .filter(Boolean);
         }
 
+        // Ensure approval_privileges values are always booleans (not null/undefined)
+        const cleanedApprovalPrivileges: Record<string, boolean> = {};
+        if (data.approval_privileges) {
+            Object.entries(data.approval_privileges).forEach(([key, value]) => {
+                // Convert any truthy/falsy value to explicit boolean
+                cleanedApprovalPrivileges[key] = Boolean(value);
+            });
+        }
+
+        // Ensure deployment_policy has proper types (arrays not null, booleans not undefined)
+        let cleanedDeploymentPolicy = null;
+        if (data.deployment_policy) {
+            cleanedDeploymentPolicy = {
+                allowed_catalogs: Array.isArray(data.deployment_policy.allowed_catalogs) 
+                    ? data.deployment_policy.allowed_catalogs.filter(Boolean) 
+                    : [],
+                allowed_schemas: Array.isArray(data.deployment_policy.allowed_schemas) 
+                    ? data.deployment_policy.allowed_schemas.filter(Boolean) 
+                    : [],
+                default_catalog: data.deployment_policy.default_catalog || null,
+                default_schema: data.deployment_policy.default_schema || null,
+                require_approval: Boolean(data.deployment_policy.require_approval),
+                can_approve_deployments: Boolean(data.deployment_policy.can_approve_deployments),
+            };
+        }
+
         const basePayload: AppRole = {
             ...data,
             assigned_groups: assignedGroupsArray,
-            approval_privileges: data.approval_privileges || {},
+            approval_privileges: cleanedApprovalPrivileges,
+            deployment_policy: cleanedDeploymentPolicy,
         } as AppRole;
 
         try {
@@ -180,13 +239,9 @@ const RoleFormDialog: React.FC<RoleFormDialogProps> = ({
                 response = await post<AppRole>('/api/settings/roles', createPayloadWithoutId);
             }
 
-            if (response.error || (response.data as any)?.detail) {
-                const errorDetail = (response.data as any)?.detail;
-                let errorMessage = response.error || 'Unknown error';
-                if (Array.isArray(errorDetail) && errorDetail.length > 0 && errorDetail[0].msg) {
-                    errorMessage = errorDetail[0].msg;
-                }
-                throw new Error(errorMessage);
+            // Check for API errors (already formatted as string by useApi hook)
+            if (response.error) {
+                throw new Error(response.error);
             }
 
             const savedRoleData = response.data as AppRole;

@@ -169,7 +169,7 @@ async def create_role(
     success = False
     details = {"role_name": role_data.name}
     try:
-        created_role = manager.create_app_role(db=db, role_data=role_data)
+        created_role = manager.create_app_role(role=role_data)
         success = True
         if created_role and hasattr(created_role, 'id'):
             details["created_role_id"] = str(created_role.id)

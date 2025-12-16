@@ -27,7 +27,27 @@ export const useApi = () => {
         } catch (parseError) {
           errorBody = response.statusText; // Fallback
         }
-        const errorMsg = errorBody?.detail || (typeof errorBody === 'string' ? errorBody : JSON.stringify(errorBody)) || `HTTP error! status: ${response.status}`;
+        // Extract meaningful error message (FastAPI detail format or fallback)
+        let errorMsg: string;
+        if (Array.isArray(errorBody?.detail) && errorBody.detail.length > 0) {
+          // FastAPI validation detail array - format all errors
+          errorMsg = errorBody.detail.map((err: any) => {
+            const loc = Array.isArray(err.loc) ? err.loc.join(' → ') : '';
+            return loc ? `${loc}: ${err.msg}` : err.msg;
+          }).join('; ');
+        } else if (errorBody?.detail) {
+          if (typeof errorBody.detail === 'string') {
+            errorMsg = errorBody.detail;
+          } else if (typeof errorBody.detail === 'object') {
+            errorMsg = errorBody.detail.message || JSON.stringify(errorBody.detail);
+          } else {
+            errorMsg = String(errorBody.detail);
+          }
+        } else if (typeof errorBody === 'string') {
+          errorMsg = errorBody;
+        } else {
+          errorMsg = JSON.stringify(errorBody) || `HTTP error! status: ${response.status}`;
+        }
         console.error("[useApi] GET error response from", url, "(", response.status, "):", errorBody);
         return { data: {} as T, error: errorMsg };
       }
@@ -195,7 +215,31 @@ export const useApi = () => {
         } catch (parseError) {
           errorBody = response.statusText; // Fallback
         }
-        const errorMsg = errorBody?.detail || (typeof errorBody === 'string' ? errorBody : JSON.stringify(errorBody)) || `HTTP error! status: ${response.status}`;
+
+        // Extract meaningful error message (FastAPI detail format or fallback)
+        let errorMsg: string;
+        if (Array.isArray(errorBody?.detail) && errorBody.detail.length > 0) {
+          // FastAPI validation detail array - format all errors
+          errorMsg = errorBody.detail.map((err: any) => {
+            const loc = Array.isArray(err.loc) ? err.loc.join(' → ') : '';
+            return loc ? `${loc}: ${err.msg}` : err.msg;
+          }).join('; ');
+        } else if (errorBody?.detail) {
+          // FastAPI detail - could be string or object
+          if (typeof errorBody.detail === 'string') {
+            errorMsg = errorBody.detail;
+          } else if (typeof errorBody.detail === 'object') {
+            // Structured error object (e.g., {message: "...", errors: [...]})
+            errorMsg = errorBody.detail.message || JSON.stringify(errorBody.detail);
+          } else {
+            errorMsg = String(errorBody.detail);
+          }
+        } else if (typeof errorBody === 'string') {
+          errorMsg = errorBody;
+        } else {
+          errorMsg = JSON.stringify(errorBody) || `HTTP error! status: ${response.status}`;
+        }
+
         console.error("[useApi] PUT error response from", url, "(", response.status, "):", errorBody);
         return { data: {} as T, error: errorMsg };
       }
@@ -231,7 +275,26 @@ export const useApi = () => {
           } catch (parseError) {
               errorBody = response.statusText; // Fallback
           }
-          errorMsg = errorBody?.detail || (typeof errorBody === 'string' ? errorBody : JSON.stringify(errorBody)) || `HTTP error! status: ${response.status}`;
+          // Extract meaningful error message (FastAPI detail format or fallback)
+          if (Array.isArray(errorBody?.detail) && errorBody.detail.length > 0) {
+            // FastAPI validation detail array - format all errors
+            errorMsg = errorBody.detail.map((err: any) => {
+              const loc = Array.isArray(err.loc) ? err.loc.join(' → ') : '';
+              return loc ? `${loc}: ${err.msg}` : err.msg;
+            }).join('; ');
+          } else if (errorBody?.detail) {
+            if (typeof errorBody.detail === 'string') {
+              errorMsg = errorBody.detail;
+            } else if (typeof errorBody.detail === 'object') {
+              errorMsg = errorBody.detail.message || JSON.stringify(errorBody.detail);
+            } else {
+              errorMsg = String(errorBody.detail);
+            }
+          } else if (typeof errorBody === 'string') {
+            errorMsg = errorBody;
+          } else {
+            errorMsg = JSON.stringify(errorBody) || `HTTP error! status: ${response.status}`;
+          }
           console.error("[useApi] DELETE error response from", url, "(", response.status, "):", errorBody);
       } else {
           // Success (usually 204 No Content for DELETE)
