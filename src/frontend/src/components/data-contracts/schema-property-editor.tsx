@@ -50,7 +50,7 @@ const TabIndicator = ({ prop }: { prop: ColumnProperty }) => {
             {indicators.map(i => (
               <span
                 key={i.key}
-                className={`w-[2px] h-[6px] ${
+                className={`w-[4px] h-[4px] ${
                   i.active ? 'bg-primary' : 'bg-muted-foreground/25'
                 }`}
               />
