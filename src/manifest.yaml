@@ -1,6 +1,19 @@
 version: 1
 name: "ontos"
 description: "An app for managing data products, contracts, and more"
+resource_specs:
+  - name: "database"
+    description: "Lakebase database for the apps metadata"
+    database_spec:
+      permission: "CAN_CONNECT_AND_CREATE"
+  - name: "sql-warehouse"
+    description: "SQL warehouse for the app to query datasets"
+    sql_warehouse_spec:
+      permission: "CAN_USE"
+  - name: "serving-endpoint"
+    description: "LLM serving endpoint for Ask Ontos"
+    serving_endpoint_spec:
+      permission: "CAN_QUERY"
 user_api_scopes:
   - "sql"
   - "sql.alerts"
