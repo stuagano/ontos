@@ -55,6 +55,11 @@
 --   01e = data_contract_schema_object_authoritative_definitions
 --   01f = data_contract_schema_property_authoritative_definitions
 --   020 = rdf_triples (demo ontology concepts)
+--   021 = datasets
+--   022 = dataset_subscriptions
+--   023 = dataset_tags
+--   024 = dataset_custom_properties
+--   025 = dataset_instances
 -- ============================================================================
 
 BEGIN;
@@ -645,7 +650,15 @@ INSERT INTO entity_semantic_links (id, entity_id, entity_type, iri, label, creat
 -- IoT Device Registry Contract > devices schema properties
 ('0150002a-0000-4000-8000-000000000042', '00400004-0000-4000-8000-000000000004#devices#device_id', 'data_contract_property', 'http://demo.ontos.app/glossary#DeviceId', 'deviceId', 'system@demo', NOW()),
 ('0150002b-0000-4000-8000-000000000043', '00400004-0000-4000-8000-000000000004#devices#device_type', 'data_contract_property', 'http://demo.ontos.app/glossary#DeviceType', 'deviceType', 'system@demo', NOW()),
-('0150002c-0000-4000-8000-000000000044', '00400004-0000-4000-8000-000000000004#devices#status', 'data_contract_property', 'http://demo.ontos.app/glossary#DeviceStatus', 'deviceStatus', 'system@demo', NOW())
+('0150002c-0000-4000-8000-000000000044', '00400004-0000-4000-8000-000000000004#devices#status', 'data_contract_property', 'http://demo.ontos.app/glossary#DeviceStatus', 'deviceStatus', 'system@demo', NOW()),
+
+-- Datasets (link to demo.ontos.app concepts)
+('0150002d-0000-4000-8000-000000000045', '02100001-0000-4000-8000-000000000001', 'dataset', 'http://demo.ontos.app/concepts#CustomerDomain', 'Customer Domain', 'system@demo', NOW()),
+('0150002e-0000-4000-8000-000000000046', '02100001-0000-4000-8000-000000000001', 'dataset', 'http://demo.ontos.app/glossary#CustomerProfile', 'Customer Profile', 'system@demo', NOW()),
+('0150002f-0000-4000-8000-000000000047', '02100004-0000-4000-8000-000000000004', 'dataset', 'http://demo.ontos.app/glossary#IoTDevice', 'IoT Device', 'system@demo', NOW()),
+('01500030-0000-4000-8000-000000000048', '02100005-0000-4000-8000-000000000005', 'dataset', 'http://demo.ontos.app/glossary#Telemetry', 'Telemetry', 'system@demo', NOW()),
+('01500031-0000-4000-8000-000000000049', '02100007-0000-4000-8000-000000000007', 'dataset', 'http://demo.ontos.app/concepts#SalesDomain', 'Sales Domain', 'system@demo', NOW()),
+('01500032-0000-4000-8000-000000000050', '02100007-0000-4000-8000-000000000007', 'dataset', 'http://demo.ontos.app/concepts#RetailDomain', 'Retail Domain', 'system@demo', NOW())
 
 ON CONFLICT (id) DO NOTHING;
 
@@ -658,7 +671,10 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO rich_text_metadata (id, entity_id, entity_type, title, short_description, content_markdown, is_shared, level, inheritable, created_by, created_at, updated_at) VALUES
 ('01600001-0000-4000-8000-000000000001', '00000004-0000-4000-8000-000000000004', 'data_domain', 'About the Marketing Domain', 'Scope, key concepts, and stakeholders for Marketing.', E'# Marketing Domain\n\nThe Marketing domain focuses on customer engagement, personalization, and campaign\neffectiveness. Typical assets include customer profiles, segmentation models,\npropensity and uplift scores, and activation datasets for outbound channels.\n\nCore concepts often used across data products:\n- Customer identity and householding\n- Consent and channel preferences\n- Campaign taxonomy and lifecycle\n- Response and attribution measures\n\nGovernance highlights include consent management and PII handling standards.', false, 50, true, 'system@demo', NOW(), NOW()),
 ('01600002-0000-4000-8000-000000000002', '00700006-0000-4000-8000-000000000006', 'data_product', 'Overview', 'What this product offers and who should use it.', E'# Customer Marketing Recommendations v1\n\nThis product provides targeted customer recommendations to support lifecycle and\npromotional campaigns. It merges prepared sales signals, customer profile\nattributes, and model outputs to produce actionable target lists.\n\nService levels and ownership:\n- Data Owner: Marketing Team\n- SLOs: Daily build by 06:00 UTC; refresh-on-demand supported\n- Data Quality: Monitored via rules on coverage, deduplication, and eligibility', false, 50, true, 'system@demo', NOW(), NOW()),
-('01600003-0000-4000-8000-000000000003', '00700006-0000-4000-8000-000000000006', 'data_product', 'Architecture & Flow', 'Inputs, transformations, and outputs at a glance.', E'## Architecture and Flow\n\nInputs include prepared sales transactions and CRM profile data. Core steps:\n1. Feature assembly and feature freshness checks\n2. Inference using latest recommendation model\n3. Eligibility filtering (consent, channel, recency)\n4. Packaging outputs for activation channels', false, 50, true, 'system@demo', NOW(), NOW())
+('01600003-0000-4000-8000-000000000003', '00700006-0000-4000-8000-000000000006', 'data_product', 'Architecture & Flow', 'Inputs, transformations, and outputs at a glance.', E'## Architecture and Flow\n\nInputs include prepared sales transactions and CRM profile data. Core steps:\n1. Feature assembly and feature freshness checks\n2. Inference using latest recommendation model\n3. Eligibility filtering (consent, channel, recency)\n4. Packaging outputs for activation channels', false, 50, true, 'system@demo', NOW(), NOW()),
+-- Dataset metadata
+('01600004-0000-4000-8000-000000000004', '02100001-0000-4000-8000-000000000001', 'dataset', 'Customer Profile Dataset', 'Production-ready customer profile data.', E'# Customer Profile Dataset\n\nThis dataset contains production customer profile data consolidated from multiple source systems.\n\n## Key Features\n- Unified customer identifiers across channels\n- Enriched with demographic attributes\n- Daily refresh cycle\n- PII masking applied\n\n## Usage Notes\nConsumers should use the `customer_id` column as the primary key for joins.', false, 50, true, 'system@demo', NOW(), NOW()),
+('01600005-0000-4000-8000-000000000005', '02100005-0000-4000-8000-000000000005', 'dataset', 'IoT Telemetry Overview', 'Real-time telemetry from IoT devices.', E'# IoT Device Telemetry\n\nThis dataset captures streaming telemetry from connected IoT devices.\n\n## Data Characteristics\n- Near real-time ingestion (latency < 5s)\n- Partitioned by device_id and event_date\n- Retention policy: 90 days hot, 2 years cold storage\n\n## Schema Notes\nThe `payload` column contains device-specific JSON data.', false, 50, true, 'system@demo', NOW(), NOW())
 
 ON CONFLICT (id) DO NOTHING;
 
@@ -668,7 +684,11 @@ INSERT INTO link_metadata (id, entity_id, entity_type, title, short_description,
 ('01700001-0000-4000-8000-000000000001', '00000004-0000-4000-8000-000000000004', 'data_domain', 'Domain Operating Model', 'Roles, responsibilities, workflows.', 'https://wiki.example.com/domains/marketing/operating-model', false, 50, true, 'system@demo', NOW(), NOW()),
 ('01700002-0000-4000-8000-000000000002', '00700006-0000-4000-8000-000000000006', 'data_product', 'Runbook', 'Operational procedures and on-call.', 'https://runbooks.example.com/marketing/customer-recs-v1', false, 50, true, 'system@demo', NOW(), NOW()),
 ('01700003-0000-4000-8000-000000000003', '00700006-0000-4000-8000-000000000006', 'data_product', 'Dashboard', 'Quality and volume tracking.', 'https://bi.example.com/dashboards/customer-recs-quality', false, 50, true, 'system@demo', NOW(), NOW()),
-('01700004-0000-4000-8000-000000000004', '00700006-0000-4000-8000-000000000006', 'data_product', 'Design Doc', 'Detailed design and decisions.', 'https://docs.example.com/design/customer-recs-v1', false, 50, true, 'system@demo', NOW(), NOW())
+('01700004-0000-4000-8000-000000000004', '00700006-0000-4000-8000-000000000006', 'data_product', 'Design Doc', 'Detailed design and decisions.', 'https://docs.example.com/design/customer-recs-v1', false, 50, true, 'system@demo', NOW(), NOW()),
+-- Dataset links
+('01700005-0000-4000-8000-000000000005', '02100001-0000-4000-8000-000000000001', 'dataset', 'Data Catalog Entry', 'View in Unity Catalog.', 'https://catalog.example.com/prod/customer/profiles', false, 50, true, 'system@demo', NOW(), NOW()),
+('01700006-0000-4000-8000-000000000006', '02100001-0000-4000-8000-000000000001', 'dataset', 'Data Lineage', 'Explore upstream and downstream dependencies.', 'https://lineage.example.com/datasets/customer-profile-prod', false, 50, true, 'system@demo', NOW(), NOW()),
+('01700007-0000-4000-8000-000000000007', '02100005-0000-4000-8000-000000000005', 'dataset', 'IoT Device Dashboard', 'Real-time device monitoring.', 'https://iot.example.com/dashboards/telemetry', false, 50, true, 'system@demo', NOW(), NOW())
 
 ON CONFLICT (id) DO NOTHING;
 
@@ -676,7 +696,9 @@ ON CONFLICT (id) DO NOTHING;
 -- Document Metadata (type=018)
 INSERT INTO document_metadata (id, entity_id, entity_type, title, short_description, original_filename, storage_path, is_shared, level, inheritable, created_by, created_at, updated_at) VALUES
 ('01800001-0000-4000-8000-000000000001', '00700006-0000-4000-8000-000000000006', 'data_product', 'Overview', 'Product overview visual.', 'customer_recs_overview.svg', 'images/customer_marketing_recos/overview.svg', false, 50, true, 'system@demo', NOW(), NOW()),
-('01800002-0000-4000-8000-000000000002', '00700006-0000-4000-8000-000000000006', 'data_product', 'Data Flow', 'High-level data flow.', 'customer_recs_flow.svg', 'images/customer_marketing_recos/flow.svg', false, 50, true, 'system@demo', NOW(), NOW())
+('01800002-0000-4000-8000-000000000002', '00700006-0000-4000-8000-000000000006', 'data_product', 'Data Flow', 'High-level data flow.', 'customer_recs_flow.svg', 'images/customer_marketing_recos/flow.svg', false, 50, true, 'system@demo', NOW(), NOW()),
+-- Dataset documents
+('01800003-0000-4000-8000-000000000003', '02100001-0000-4000-8000-000000000001', 'dataset', 'ERD Diagram', 'Entity relationship diagram.', 'customer_profile_erd.svg', 'images/datasets/customer_profile_erd.svg', false, 50, true, 'system@demo', NOW(), NOW())
 
 ON CONFLICT (id) DO NOTHING;
 
@@ -887,6 +909,179 @@ INSERT INTO data_contract_schema_property_authoritative_definitions (id, propert
 -- devices.status (0060000e)
 ('01f00014-0000-4000-8000-000000000020', '0060000e-0000-4000-8000-000000000014', 'http://glossary.example.com/terms/DeviceStatus', 'businessTerm'),
 ('01f00015-0000-4000-8000-000000000021', '0060000e-0000-4000-8000-000000000014', 'http://glossary.example.com/terms/OperationalState', 'businessTerm')
+
+ON CONFLICT (id) DO NOTHING;
+
+
+-- ============================================================================
+-- 14. DATA CONTRACT SERVERS
+-- ============================================================================
+-- Server definitions for contracts (needed for dataset instances)
+-- Servers define where contract data can be physically implemented
+
+INSERT INTO data_contract_servers (id, contract_id, server, type, description, environment) VALUES
+-- Customer Data Contract servers
+('srv00001-0000-4000-8000-000000000001', '00400001-0000-4000-8000-000000000001', 'uc-dev-workspace', 'databricks', 'Development Unity Catalog workspace', 'dev'),
+('srv00002-0000-4000-8000-000000000002', '00400001-0000-4000-8000-000000000001', 'uc-prod-workspace', 'databricks', 'Production Unity Catalog workspace', 'prod'),
+('srv00003-0000-4000-8000-000000000003', '00400001-0000-4000-8000-000000000001', 'snowflake-analytics', 'snowflake', 'Snowflake analytics warehouse', 'prod'),
+
+-- IoT Device Data Contract servers
+('srv00004-0000-4000-8000-000000000004', '00400004-0000-4000-8000-000000000004', 'uc-iot-dev', 'databricks', 'IoT development environment', 'dev'),
+('srv00005-0000-4000-8000-000000000005', '00400004-0000-4000-8000-000000000004', 'uc-iot-prod', 'databricks', 'IoT production environment', 'prod'),
+
+-- Financial Transactions Contract servers
+('srv00006-0000-4000-8000-000000000006', '00400006-0000-4000-8000-000000000006', 'finance-dev', 'databricks', 'Finance dev workspace', 'dev'),
+('srv00007-0000-4000-8000-000000000007', '00400006-0000-4000-8000-000000000006', 'finance-prod', 'databricks', 'Finance production workspace', 'prod'),
+('srv00008-0000-4000-8000-000000000008', '00400006-0000-4000-8000-000000000006', 'bq-finance-reporting', 'bigquery', 'BigQuery finance reporting', 'prod')
+
+ON CONFLICT (id) DO NOTHING;
+
+
+-- ============================================================================
+-- 15. DATASETS (type=021)
+-- ============================================================================
+-- Physical implementations of data contracts
+
+INSERT INTO datasets (id, name, description, asset_type, catalog_name, schema_name, object_name, environment, contract_id, owner_team_id, project_id, status, version, published, max_level_inheritance, created_by, updated_by, created_at, updated_at) VALUES
+-- Customer datasets
+('02100001-0000-4000-8000-000000000001', 'Customer Master - Production', 'Production customer master data implementing the Customer Data Contract', 'table', 'prod_catalog', 'crm', 'customers_master', 'prod', '00400001-0000-4000-8000-000000000001', '00100001-0000-4000-8000-000000000001', '00300001-0000-4000-8000-000000000001', 'active', '1.0.0', true, 99, 'system@demo', 'system@demo', NOW(), NOW()),
+('02100002-0000-4000-8000-000000000002', 'Customer Master - Development', 'Development customer data for testing', 'table', 'dev_catalog', 'crm', 'customers_master', 'dev', '00400001-0000-4000-8000-000000000001', '00100001-0000-4000-8000-000000000001', '00300001-0000-4000-8000-000000000001', 'active', '2.0.0-draft', false, 99, 'system@demo', 'system@demo', NOW(), NOW()),
+('02100003-0000-4000-8000-000000000003', 'Customer Preferences View', 'Aggregated customer preferences view', 'view', 'prod_catalog', 'crm', 'v_customer_preferences', 'prod', '00400001-0000-4000-8000-000000000001', '00100002-0000-4000-8000-000000000002', '00300001-0000-4000-8000-000000000001', 'active', '1.0.0', true, 99, 'system@demo', 'system@demo', NOW(), NOW()),
+
+-- IoT datasets
+('02100004-0000-4000-8000-000000000004', 'IoT Device Registry', 'Production registry of all IoT devices', 'table', 'iot_catalog', 'devices', 'device_registry', 'prod', '00400004-0000-4000-8000-000000000004', '00100003-0000-4000-8000-000000000003', '00300003-0000-4000-8000-000000000003', 'active', '1.1.0', true, 99, 'system@demo', 'system@demo', NOW(), NOW()),
+('02100005-0000-4000-8000-000000000005', 'IoT Telemetry Stream', 'Real-time telemetry data from IoT devices', 'table', 'iot_catalog', 'telemetry', 'device_readings', 'prod', '00400004-0000-4000-8000-000000000004', '00100003-0000-4000-8000-000000000003', '00300003-0000-4000-8000-000000000003', 'active', '1.1.0', true, 99, 'system@demo', 'system@demo', NOW(), NOW()),
+
+-- Financial datasets
+('02100006-0000-4000-8000-000000000006', 'Financial Transactions - Draft', 'Draft financial transactions dataset for testing', 'table', 'finance_dev', 'transactions', 'daily_transactions', 'dev', '00400006-0000-4000-8000-000000000006', '00100004-0000-4000-8000-000000000004', '00300002-0000-4000-8000-000000000002', 'draft', '1.0.0-alpha', false, 99, 'system@demo', 'system@demo', NOW(), NOW()),
+
+-- Retail/Analytics datasets
+('02100007-0000-4000-8000-000000000007', 'Sales Analytics Summary', 'Aggregated sales analytics for BI dashboards', 'view', 'analytics_catalog', 'retail', 'v_sales_summary', 'prod', NULL, '00100002-0000-4000-8000-000000000002', '00300005-0000-4000-8000-000000000005', 'active', '2.0.0', true, 99, 'system@demo', 'system@demo', NOW(), NOW()),
+('02100008-0000-4000-8000-000000000008', 'Inventory Levels', 'Current inventory levels across warehouses', 'table', 'analytics_catalog', 'supply_chain', 'inventory_current', 'prod', '00400007-0000-4000-8000-000000000007', '00100001-0000-4000-8000-000000000001', '00300005-0000-4000-8000-000000000005', 'deprecated', '1.2.0', false, 99, 'system@demo', 'system@demo', NOW(), NOW())
+
+ON CONFLICT (id) DO NOTHING;
+
+
+-- ============================================================================
+-- 15b. DATASET SUBSCRIPTIONS (type=022)
+-- ============================================================================
+
+INSERT INTO dataset_subscriptions (id, dataset_id, subscriber_email, subscribed_at, subscription_reason) VALUES
+-- Customer Master - Production subscribers
+('02200001-0000-4000-8000-000000000001', '02100001-0000-4000-8000-000000000001', 'alice.johnson@company.com', NOW() - INTERVAL '30 days', 'Analytics team lead - need updates for customer 360 project'),
+('02200002-0000-4000-8000-000000000002', '02100001-0000-4000-8000-000000000001', 'marketing-lead@example.com', NOW() - INTERVAL '20 days', 'Campaign targeting use case'),
+('02200003-0000-4000-8000-000000000003', '02100001-0000-4000-8000-000000000001', 'data.steward@example.com', NOW() - INTERVAL '15 days', 'Governance oversight'),
+
+-- IoT datasets subscribers
+('02200004-0000-4000-8000-000000000004', '02100004-0000-4000-8000-000000000004', 'bob.wilson@company.com', NOW() - INTERVAL '10 days', 'ML model training data source'),
+('02200005-0000-4000-8000-000000000005', '02100005-0000-4000-8000-000000000005', 'bob.wilson@company.com', NOW() - INTERVAL '10 days', 'Anomaly detection pipeline'),
+
+-- Sales Analytics subscribers
+('02200006-0000-4000-8000-000000000006', '02100007-0000-4000-8000-000000000007', 'analyst@example.com', NOW() - INTERVAL '5 days', 'Weekly reporting')
+
+ON CONFLICT (id) DO NOTHING;
+
+
+-- ============================================================================
+-- 15c. DATASET TAGS (type=023)
+-- ============================================================================
+
+INSERT INTO dataset_tags (id, dataset_id, name) VALUES
+-- Customer Master - Production tags
+('02300001-0000-4000-8000-000000000001', '02100001-0000-4000-8000-000000000001', 'pii'),
+('02300002-0000-4000-8000-000000000002', '02100001-0000-4000-8000-000000000001', 'gdpr'),
+('02300003-0000-4000-8000-000000000003', '02100001-0000-4000-8000-000000000001', 'customer-360'),
+('02300004-0000-4000-8000-000000000004', '02100001-0000-4000-8000-000000000001', 'gold-tier'),
+
+-- Customer Master - Development tags
+('02300005-0000-4000-8000-000000000005', '02100002-0000-4000-8000-000000000002', 'test-data'),
+('02300006-0000-4000-8000-000000000006', '02100002-0000-4000-8000-000000000002', 'synthetic'),
+
+-- IoT datasets tags
+('02300007-0000-4000-8000-000000000007', '02100004-0000-4000-8000-000000000004', 'iot'),
+('02300008-0000-4000-8000-000000000008', '02100004-0000-4000-8000-000000000004', 'device-management'),
+('02300009-0000-4000-8000-000000000009', '02100005-0000-4000-8000-000000000005', 'iot'),
+('0230000a-0000-4000-8000-000000000010', '02100005-0000-4000-8000-000000000005', 'streaming'),
+('0230000b-0000-4000-8000-000000000011', '02100005-0000-4000-8000-000000000005', 'real-time'),
+
+-- Sales Analytics tags
+('0230000c-0000-4000-8000-000000000012', '02100007-0000-4000-8000-000000000007', 'analytics'),
+('0230000d-0000-4000-8000-000000000013', '02100007-0000-4000-8000-000000000007', 'bi-ready'),
+('0230000e-0000-4000-8000-000000000014', '02100007-0000-4000-8000-000000000007', 'retail')
+
+ON CONFLICT (id) DO NOTHING;
+
+
+-- ============================================================================
+-- 15d. DATASET CUSTOM PROPERTIES (type=024)
+-- ============================================================================
+
+INSERT INTO dataset_custom_properties (id, dataset_id, property, value) VALUES
+-- Customer Master - Production properties
+('02400001-0000-4000-8000-000000000001', '02100001-0000-4000-8000-000000000001', 'data_classification', 'confidential'),
+('02400002-0000-4000-8000-000000000002', '02100001-0000-4000-8000-000000000001', 'retention_days', '2555'),
+('02400003-0000-4000-8000-000000000003', '02100001-0000-4000-8000-000000000001', 'refresh_schedule', 'daily'),
+
+-- IoT Telemetry properties
+('02400004-0000-4000-8000-000000000004', '02100005-0000-4000-8000-000000000005', 'partition_by', 'date'),
+('02400005-0000-4000-8000-000000000005', '02100005-0000-4000-8000-000000000005', 'retention_days', '730'),
+('02400006-0000-4000-8000-000000000006', '02100005-0000-4000-8000-000000000005', 'compression', 'zstd'),
+
+-- Sales Analytics properties
+('02400007-0000-4000-8000-000000000007', '02100007-0000-4000-8000-000000000007', 'materialized', 'true'),
+('02400008-0000-4000-8000-000000000008', '02100007-0000-4000-8000-000000000007', 'refresh_schedule', 'hourly')
+
+ON CONFLICT (id) DO NOTHING;
+
+
+-- ============================================================================
+-- 15e. DATASET INSTANCES (type=025)
+-- ============================================================================
+-- Physical implementations of datasets across different systems/environments
+
+INSERT INTO dataset_instances (id, dataset_id, contract_id, contract_server_id, physical_path, status, notes, created_by, created_at, updated_at) VALUES
+-- Customer Master - Production instances
+('02500001-0000-4000-8000-000000000001', '02100001-0000-4000-8000-000000000001', '00400001-0000-4000-8000-000000000001', 'srv00002-0000-4000-8000-000000000002', 'prod_catalog.crm.customers_master', 'active', 'Primary production instance in Unity Catalog', 'system@demo', NOW(), NOW()),
+('02500002-0000-4000-8000-000000000002', '02100001-0000-4000-8000-000000000001', '00400001-0000-4000-8000-000000000001', 'srv00003-0000-4000-8000-000000000003', 'ANALYTICS_DB.CRM.CUSTOMERS_MASTER', 'active', 'Snowflake replica for analytics workloads', 'system@demo', NOW(), NOW()),
+
+-- Customer Master - Development instances
+('02500003-0000-4000-8000-000000000003', '02100002-0000-4000-8000-000000000002', '00400001-0000-4000-8000-000000000001', 'srv00001-0000-4000-8000-000000000001', 'dev_catalog.crm.customers_master', 'active', 'Development instance for testing new features', 'system@demo', NOW(), NOW()),
+
+-- Customer Preferences View instances
+('02500004-0000-4000-8000-000000000004', '02100003-0000-4000-8000-000000000003', '00400001-0000-4000-8000-000000000001', 'srv00002-0000-4000-8000-000000000002', 'prod_catalog.crm.v_customer_preferences', 'active', 'Production view aggregating customer preferences', 'system@demo', NOW(), NOW()),
+
+-- IoT Device Registry instances
+('02500005-0000-4000-8000-000000000005', '02100004-0000-4000-8000-000000000004', '00400004-0000-4000-8000-000000000004', 'srv00005-0000-4000-8000-000000000005', 'iot_catalog.devices.device_registry', 'active', 'Production IoT device registry', 'system@demo', NOW(), NOW()),
+('02500006-0000-4000-8000-000000000006', '02100004-0000-4000-8000-000000000004', '00400004-0000-4000-8000-000000000004', 'srv00004-0000-4000-8000-000000000004', 'iot_dev.devices.device_registry', 'active', 'Development IoT device registry for testing', 'system@demo', NOW(), NOW()),
+
+-- IoT Telemetry instances
+('02500007-0000-4000-8000-000000000007', '02100005-0000-4000-8000-000000000005', '00400004-0000-4000-8000-000000000004', 'srv00005-0000-4000-8000-000000000005', 'iot_catalog.telemetry.device_readings', 'active', 'Production telemetry data', 'system@demo', NOW(), NOW()),
+
+-- Financial Transactions instances
+('02500008-0000-4000-8000-000000000008', '02100006-0000-4000-8000-000000000006', '00400006-0000-4000-8000-000000000006', 'srv00006-0000-4000-8000-000000000006', 'finance_dev.transactions.daily_transactions', 'active', 'Development instance for financial testing', 'system@demo', NOW(), NOW()),
+
+-- Inventory Levels - deprecated dataset instance
+('02500009-0000-4000-8000-000000000009', '02100008-0000-4000-8000-000000000008', '00400007-0000-4000-8000-000000000007', NULL, 'analytics_catalog.supply_chain.inventory_current', 'deprecated', 'Legacy inventory table - migrating to new schema', 'system@demo', NOW(), NOW())
+
+ON CONFLICT (id) DO NOTHING;
+
+
+-- ============================================================================
+-- 15f. DATASET SUBSCRIPTIONS (type=026)
+-- ============================================================================
+-- Consumer subscriptions to datasets for notifications
+
+INSERT INTO dataset_subscriptions (id, dataset_id, subscriber_email, subscription_reason, subscribed_at) VALUES
+-- Subscriptions to Customer Master Production
+('02600001-0000-4000-8000-000000000001', '02100001-0000-4000-8000-000000000001', 'alice.analyst@example.com', 'Needed for marketing dashboards', NOW() - INTERVAL '30 days'),
+('02600002-0000-4000-8000-000000000002', '02100001-0000-4000-8000-000000000001', 'bob.scientist@example.com', 'ML model training data', NOW() - INTERVAL '25 days'),
+('02600003-0000-4000-8000-000000000003', '02100001-0000-4000-8000-000000000001', 'carol.engineer@example.com', 'Data pipeline integration', NOW() - INTERVAL '20 days'),
+-- Subscriptions to IoT Telemetry
+('02600004-0000-4000-8000-000000000004', '02100005-0000-4000-8000-000000000005', 'david.ops@example.com', 'Real-time monitoring dashboards', NOW() - INTERVAL '15 days'),
+('02600005-0000-4000-8000-000000000005', '02100005-0000-4000-8000-000000000005', 'eve.developer@example.com', 'IoT analytics application', NOW() - INTERVAL '10 days'),
+-- Subscriptions to Retail Sales
+('02600006-0000-4000-8000-000000000006', '02100007-0000-4000-8000-000000000007', 'frank.finance@example.com', 'Revenue reporting', NOW() - INTERVAL '5 days'),
+('02600007-0000-4000-8000-000000000007', '02100007-0000-4000-8000-000000000007', 'alice.analyst@example.com', 'Sales trend analysis', NOW() - INTERVAL '3 days')
 
 ON CONFLICT (id) DO NOTHING;
 
