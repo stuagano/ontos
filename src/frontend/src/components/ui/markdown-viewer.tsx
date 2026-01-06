@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface MarkdownViewerProps {
   markdown: string;
@@ -31,6 +32,7 @@ function extractText(children: React.ReactNode): string {
 const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ markdown }) => {
   return (
     <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
       components={{
         h1: ({ children }) => {
           const id = slugify(extractText(children));
