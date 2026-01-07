@@ -456,13 +456,34 @@ class DataContractsManager(SearchableAsset):
                         desc_parts.append(str(description_usage))
                     description = " \u2022 ".join([p for p in desc_parts if p])
 
-                    # Tags relation is optional; collect simple names if present
+                    # Collect tags from BOTH sources:
+                    # 1. Legacy ODCS tags (DataContractTagDb) - from imported contracts
+                    # 2. Unified tag system (EntityTagAssociationDb) - app-assigned tags
                     tag_names: List[str] = []
+                    
+                    # 1. Legacy ODCS tags from contract import
                     try:
                         if getattr(contract_db, 'tags', None):
-                            tag_names = [t.name for t in contract_db.tags if getattr(t, 'name', None)]
+                            for t in contract_db.tags:
+                                # DataContractTagDb has simple 'name' field for ODCS tags
+                                if getattr(t, 'name', None):
+                                    tag_names.append(t.name)
                     except Exception:
-                        tag_names = []
+                        pass
+                    
+                    # 2. Unified tag system (EntityTagAssociationDb)
+                    try:
+                        from src.repositories.tags_repository import entity_tag_repo
+                        assigned_tags = entity_tag_repo.get_assigned_tags_for_entity(
+                            db=db,
+                            entity_id=str(contract_id),
+                            entity_type="data_contract"
+                        )
+                        for tag in assigned_tags:
+                            if hasattr(tag, 'fully_qualified_name') and tag.fully_qualified_name:
+                                tag_names.append(tag.fully_qualified_name)
+                    except Exception as tag_err:
+                        logger.debug(f"Could not load unified tags for contract {contract_id}: {tag_err}")
 
                     # Build extra_data for configurable search fields
                     owner = ""

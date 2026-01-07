@@ -27,6 +27,7 @@ from src.repositories.datasets_repository import (
     dataset_custom_property_repo,
     dataset_instance_repo,
 )
+from src.repositories.tags_repository import entity_tag_repo
 from src.models.datasets import (
     Dataset,
     DatasetCreate,
@@ -71,12 +72,26 @@ class DatasetsManager(SearchableAsset):
     def get_search_index_items(self) -> List[SearchIndexItem]:
         """
         Fetches datasets and maps them to SearchIndexItem format for global search.
+        Uses the unified tag system (EntityTagAssociationDb) for tag lookups.
         """
         items: List[SearchIndexItem] = []
         try:
             datasets = dataset_repo.get_multi(db=self._db, limit=1000)
             for ds in datasets:
-                tags = [tag.name for tag in ds.tags] if ds.tags else []
+                # Get tags from unified tag system (EntityTagAssociationDb)
+                tags = []
+                try:
+                    assigned_tags = entity_tag_repo.get_assigned_tags_for_entity(
+                        db=self._db,
+                        entity_id=str(ds.id),
+                        entity_type="dataset"
+                    )
+                    for tag in assigned_tags:
+                        if hasattr(tag, 'fully_qualified_name') and tag.fully_qualified_name:
+                            tags.append(tag.fully_qualified_name)
+                except Exception as tag_err:
+                    logger.debug(f"Could not load tags for dataset {ds.id}: {tag_err}")
+                
                 tags.append(ds.environment)  # Add environment as a searchable tag
                 tags.append(ds.asset_type)  # Add asset type as a searchable tag
                 

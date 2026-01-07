@@ -261,7 +261,9 @@ class SearchManager:
             if value_lower.startswith(query):
                 return 1.0
             # Also check word boundaries for multi-word values
-            words = value_lower.split()
+            # Split on spaces AND slashes to handle FQN tag format (namespace/tagname)
+            import re
+            words = re.split(r'[\s/]+', value_lower)
             for word in words:
                 if word.startswith(query):
                     return 0.9  # Slightly lower score for non-leading word match

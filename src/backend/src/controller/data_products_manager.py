@@ -1841,14 +1841,21 @@ class DataProductsManager(SearchableAsset):
                         parts.append(product.description.usage)
                     description = " | ".join(parts)
 
-                # Normalize tags
+                # Normalize tags - extract FQN from AssignedTag objects or dicts
                 tag_strings: List[str] = []
                 try:
                     for t in (product.tags or []):
-                        if isinstance(t, dict):
-                            fqn = t.get('tag_fqn')
+                        # AssignedTag Pydantic model
+                        if hasattr(t, 'fully_qualified_name') and t.fully_qualified_name:
+                            tag_strings.append(t.fully_qualified_name)
+                        # Dict with tag_fqn or fully_qualified_name
+                        elif isinstance(t, dict):
+                            fqn = t.get('fully_qualified_name') or t.get('tag_fqn')
                             if fqn:
                                 tag_strings.append(str(fqn))
+                        # Fallback: try tag_name attribute or string conversion
+                        elif hasattr(t, 'tag_name') and t.tag_name:
+                            tag_strings.append(str(t.tag_name))
                         else:
                             tag_strings.append(str(t))
                 except Exception:
