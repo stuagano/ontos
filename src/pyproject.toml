@@ -5,10 +5,10 @@ build-backend = "hatchling.build"
 [project]
 name = "ontos"
 version = "0.1.0"
-description = "Unified Catalog Application"
+description = "A Business Catalog for the Databricks Platform"
 readme = "../README.md"
 authors = [
-    { name="larsgeorge", email="lars.george@gmail.com" }
+    { name="Databricks", email="ontos-support@databricks.com" }
 ]
 license = "Databricks License"
 requires-python = ">=3.10,<3.13"
