@@ -11,7 +11,6 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, sta
 from src.common.dependencies import (
     DBSessionDep,
     CurrentUserDep,
-    WorkspaceClientDep,
 )
 from src.common.authorization import PermissionChecker
 from src.common.features import FeatureAccessLevel
@@ -43,9 +42,13 @@ FEATURE_ID = "datasets"
 # Helper to get manager instance
 # =============================================================================
 
-def get_datasets_manager(db: DBSessionDep, ws_client: WorkspaceClientDep) -> DatasetsManager:
-    """Create a DatasetsManager instance."""
-    return DatasetsManager(db=db, ws_client=ws_client)
+def get_datasets_manager(request: Request) -> DatasetsManager:
+    """Get the DatasetsManager from app.state (initialized at startup with TagsManager)."""
+    manager = getattr(request.app.state, 'datasets_manager', None)
+    if not manager:
+        logger.critical("DatasetsManager not found in application state during request!")
+        raise HTTPException(status_code=503, detail="Datasets service not configured.")
+    return manager
 
 
 # =============================================================================
@@ -56,13 +59,12 @@ def get_datasets_manager(db: DBSessionDep, ws_client: WorkspaceClientDep) -> Dat
 
 @router.get("/datasets/published", response_model=List[DatasetListItem])
 async def get_published_datasets(
+    request: Request,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
     current_user: CurrentUserDep,
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_ONLY)),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum records to return"),
-    environment: Optional[str] = Query(None, description="Filter by environment (dev/staging/prod)"),
     search: Optional[str] = Query(None, description="Search in name and description"),
 ):
     """
@@ -73,11 +75,10 @@ async def get_published_datasets(
     """
     logger.debug(f"Get published datasets request from user {current_user.username}")
     
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     datasets = manager.list_datasets(
         skip=skip,
         limit=limit,
-        environment=environment,
         published=True,
         status="active",
         search=search,
@@ -88,8 +89,8 @@ async def get_published_datasets(
 
 @router.get("/datasets/my-subscriptions", response_model=List[DatasetListItem])
 async def get_my_dataset_subscriptions(
+    request: Request,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
     current_user: CurrentUserDep,
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_ONLY)),
     skip: int = Query(0, ge=0),
@@ -103,7 +104,7 @@ async def get_my_dataset_subscriptions(
     if not current_user or not current_user.username:
         raise HTTPException(status_code=401, detail="Authentication required")
     
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     return manager.get_user_subscriptions(
         subscriber_email=current_user.username,
         skip=skip,
@@ -113,42 +114,36 @@ async def get_my_dataset_subscriptions(
 
 @router.get("/datasets", response_model=List[DatasetListItem])
 async def list_datasets(
+    request: Request,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
     current_user: CurrentUserDep,
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_ONLY)),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum records to return"),
-    environment: Optional[str] = Query(None, description="Filter by environment (dev/staging/prod)"),
     status: Optional[str] = Query(None, description="Filter by status"),
-    asset_type: Optional[str] = Query(None, description="Filter by asset type (table/view)"),
     contract_id: Optional[str] = Query(None, description="Filter by contract ID"),
     owner_team_id: Optional[str] = Query(None, description="Filter by owner team ID"),
     project_id: Optional[str] = Query(None, description="Filter by project ID"),
     published: Optional[bool] = Query(None, description="Filter by publication status"),
-    catalog_name: Optional[str] = Query(None, description="Filter by catalog name"),
     search: Optional[str] = Query(None, description="Search in name and description"),
 ):
     """
     List all datasets with optional filtering.
     
-    Supports filtering by environment, status, asset type, contract, owner team,
-    project, publication status, catalog, and search text.
+    Datasets are logical groupings of related data assets.
+    Physical implementations are accessed via dataset instances.
     """
     logger.debug(f"List datasets request from user {current_user.username}")
     
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     datasets = manager.list_datasets(
         skip=skip,
         limit=limit,
-        environment=environment,
         status=status,
-        asset_type=asset_type,
         contract_id=contract_id,
         owner_team_id=owner_team_id,
         project_id=project_id,
         published=published,
-        catalog_name=catalog_name,
         search=search,
     )
     
@@ -157,9 +152,10 @@ async def list_datasets(
 
 @router.get("/datasets/by-contract/{contract_id}", response_model=List[DatasetListItem])
 async def get_datasets_by_contract(
+    request: Request,
     contract_id: str,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
+
     current_user: CurrentUserDep,
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_ONLY)),
     skip: int = Query(0, ge=0),
@@ -173,7 +169,7 @@ async def get_datasets_by_contract(
     """
     logger.debug(f"Get datasets for contract {contract_id}")
     
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     datasets = manager.get_datasets_by_contract(
         contract_id=contract_id,
         skip=skip,
@@ -189,9 +185,10 @@ async def get_datasets_by_contract(
 
 @router.get("/datasets/{dataset_id}", response_model=Dataset)
 async def get_dataset(
+    request: Request,
     dataset_id: str,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
+
     current_user: CurrentUserDep,
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_ONLY)),
 ):
@@ -203,7 +200,7 @@ async def get_dataset(
     """
     logger.debug(f"Get dataset {dataset_id}")
     
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     dataset = manager.get_dataset(dataset_id)
     
     if not dataset:
@@ -219,7 +216,7 @@ async def get_dataset(
 async def create_dataset(
     request: Request,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
+
     current_user: CurrentUserDep,
     dataset_data: DatasetCreate = Body(...),
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_WRITE)),
@@ -232,7 +229,7 @@ async def create_dataset(
     """
     logger.info(f"Create dataset request from user {current_user.username}: {dataset_data.name}")
     
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     
     try:
         dataset = manager.create_dataset(
@@ -258,7 +255,7 @@ async def update_dataset(
     dataset_id: str,
     request: Request,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
+
     current_user: CurrentUserDep,
     dataset_data: DatasetUpdate = Body(...),
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_WRITE)),
@@ -270,7 +267,7 @@ async def update_dataset(
     """
     logger.info(f"Update dataset {dataset_id} by user {current_user.username}")
     
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     
     try:
         dataset = manager.update_dataset(
@@ -303,9 +300,10 @@ async def update_dataset(
 
 @router.delete("/datasets/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_dataset(
+    request: Request,
     dataset_id: str,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
+
     current_user: CurrentUserDep,
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.ADMIN)),
 ):
@@ -317,7 +315,7 @@ async def delete_dataset(
     """
     logger.info(f"Delete dataset {dataset_id} by user {current_user.username}")
     
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     
     success = manager.delete_dataset(dataset_id)
     
@@ -334,9 +332,10 @@ async def delete_dataset(
 
 @router.post("/datasets/{dataset_id}/publish")
 async def publish_dataset(
+    request: Request,
     dataset_id: str,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
+
     current_user: CurrentUserDep,
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_WRITE)),
 ):
@@ -348,7 +347,7 @@ async def publish_dataset(
     """
     logger.info(f"Publish dataset {dataset_id} by user {current_user.username}")
     
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     
     try:
         dataset = manager.publish_dataset(
@@ -371,9 +370,10 @@ async def publish_dataset(
 
 @router.post("/datasets/{dataset_id}/unpublish")
 async def unpublish_dataset(
+    request: Request,
     dataset_id: str,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
+
     current_user: CurrentUserDep,
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_WRITE)),
 ):
@@ -385,7 +385,7 @@ async def unpublish_dataset(
     """
     logger.info(f"Unpublish dataset {dataset_id} by user {current_user.username}")
     
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     
     try:
         dataset = manager.unpublish_dataset(
@@ -412,10 +412,11 @@ async def unpublish_dataset(
 
 @router.post("/datasets/{dataset_id}/contract/{contract_id}", response_model=Dataset)
 async def assign_contract(
+    request: Request,
     dataset_id: str,
     contract_id: str,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
+
     current_user: CurrentUserDep,
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_WRITE)),
 ):
@@ -427,7 +428,7 @@ async def assign_contract(
     """
     logger.info(f"Assign contract {contract_id} to dataset {dataset_id}")
     
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     
     dataset = manager.assign_contract(
         dataset_id=dataset_id,
@@ -446,9 +447,10 @@ async def assign_contract(
 
 @router.delete("/datasets/{dataset_id}/contract", response_model=Dataset)
 async def unassign_contract(
+    request: Request,
     dataset_id: str,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
+
     current_user: CurrentUserDep,
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_WRITE)),
 ):
@@ -459,7 +461,7 @@ async def unassign_contract(
     """
     logger.info(f"Unassign contract from dataset {dataset_id}")
     
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     
     dataset = manager.unassign_contract(
         dataset_id=dataset_id,
@@ -481,16 +483,17 @@ async def unassign_contract(
 
 @router.get("/datasets/{dataset_id}/subscription", response_model=DatasetSubscriptionResponse)
 async def get_subscription_status(
+    request: Request,
     dataset_id: str,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
+
     current_user: CurrentUserDep,
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_ONLY)),
 ):
     """
     Check if the current user is subscribed to a dataset.
     """
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     
     return manager.get_subscription_status(
         dataset_id=dataset_id,
@@ -500,9 +503,10 @@ async def get_subscription_status(
 
 @router.post("/datasets/{dataset_id}/subscribe", response_model=DatasetSubscriptionResponse)
 async def subscribe_to_dataset(
+    request: Request,
     dataset_id: str,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
+
     current_user: CurrentUserDep,
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_ONLY)),
     data: Optional[DatasetSubscriptionCreate] = None,
@@ -515,7 +519,7 @@ async def subscribe_to_dataset(
     """
     logger.info(f"User {current_user.username} subscribing to dataset {dataset_id}")
     
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     
     try:
         return manager.subscribe(
@@ -532,9 +536,10 @@ async def subscribe_to_dataset(
 
 @router.delete("/datasets/{dataset_id}/subscribe", response_model=DatasetSubscriptionResponse)
 async def unsubscribe_from_dataset(
+    request: Request,
     dataset_id: str,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
+
     current_user: CurrentUserDep,
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_ONLY)),
 ):
@@ -543,7 +548,7 @@ async def unsubscribe_from_dataset(
     """
     logger.info(f"User {current_user.username} unsubscribing from dataset {dataset_id}")
     
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     
     return manager.unsubscribe(
         dataset_id=dataset_id,
@@ -553,9 +558,10 @@ async def unsubscribe_from_dataset(
 
 @router.get("/datasets/{dataset_id}/subscribers", response_model=DatasetSubscribersListResponse)
 async def get_dataset_subscribers(
+    request: Request,
     dataset_id: str,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
+
     current_user: CurrentUserDep,
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_WRITE)),
     skip: int = Query(0, ge=0),
@@ -566,7 +572,7 @@ async def get_dataset_subscribers(
     
     Requires READ_WRITE permission to view subscriber list.
     """
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     
     return manager.get_subscribers(
         dataset_id=dataset_id,
@@ -581,9 +587,9 @@ async def get_dataset_subscribers(
 
 @router.get("/datasets/{dataset_id}/instances", response_model=DatasetInstanceListResponse)
 async def list_dataset_instances(
+    request: Request,
     dataset_id: str,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
     current_user: CurrentUserDep,
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_ONLY)),
     skip: int = Query(0, ge=0),
@@ -595,7 +601,7 @@ async def list_dataset_instances(
     Returns information about where the dataset is physically implemented,
     including the system type, environment, and physical path.
     """
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     
     try:
         return manager.list_instances(
@@ -612,17 +618,17 @@ async def list_dataset_instances(
 
 @router.get("/datasets/{dataset_id}/instances/{instance_id}", response_model=DatasetInstance)
 async def get_dataset_instance(
+    request: Request,
     dataset_id: str,
     instance_id: str,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
     current_user: CurrentUserDep,
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_ONLY)),
 ):
     """
     Get a single instance by ID.
     """
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     
     instance = manager.get_instance(instance_id)
     
@@ -644,9 +650,9 @@ async def get_dataset_instance(
 
 @router.post("/datasets/{dataset_id}/instances", response_model=DatasetInstance, status_code=status.HTTP_201_CREATED)
 async def add_dataset_instance(
+    request: Request,
     dataset_id: str,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
     current_user: CurrentUserDep,
     instance_data: DatasetInstanceCreate = Body(...),
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_WRITE)),
@@ -659,7 +665,7 @@ async def add_dataset_instance(
     """
     logger.info(f"Add instance to dataset {dataset_id} by user {current_user.username}")
     
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     
     try:
         return manager.add_instance(
@@ -682,10 +688,10 @@ async def add_dataset_instance(
 
 @router.put("/datasets/{dataset_id}/instances/{instance_id}", response_model=DatasetInstance)
 async def update_dataset_instance(
+    request: Request,
     dataset_id: str,
     instance_id: str,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
     current_user: CurrentUserDep,
     instance_data: DatasetInstanceUpdate = Body(...),
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_WRITE)),
@@ -695,7 +701,7 @@ async def update_dataset_instance(
     """
     logger.info(f"Update instance {instance_id} in dataset {dataset_id} by user {current_user.username}")
     
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     
     try:
         instance = manager.update_instance(
@@ -735,10 +741,10 @@ async def update_dataset_instance(
 
 @router.delete("/datasets/{dataset_id}/instances/{instance_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_dataset_instance(
+    request: Request,
     dataset_id: str,
     instance_id: str,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
     current_user: CurrentUserDep,
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_WRITE)),
 ):
@@ -747,7 +753,7 @@ async def remove_dataset_instance(
     """
     logger.info(f"Remove instance {instance_id} from dataset {dataset_id} by user {current_user.username}")
     
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     
     # First verify the instance exists and belongs to the dataset
     instance = manager.get_instance(instance_id)
@@ -778,11 +784,11 @@ async def remove_dataset_instance(
 
 @router.get("/datasets/validate-asset/{catalog_name}/{schema_name}/{object_name}")
 async def validate_asset(
+    request: Request,
     catalog_name: str,
     schema_name: str,
     object_name: str,
     db: DBSessionDep,
-    ws_client: WorkspaceClientDep,
     current_user: CurrentUserDep,
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_ONLY)),
 ):
@@ -792,7 +798,7 @@ async def validate_asset(
     Returns information about the asset if found, or an error message if not.
     Useful for validating asset paths before creating datasets.
     """
-    manager = get_datasets_manager(db, ws_client)
+    manager = get_datasets_manager(request)
     
     return manager.validate_asset_exists(
         catalog_name=catalog_name,

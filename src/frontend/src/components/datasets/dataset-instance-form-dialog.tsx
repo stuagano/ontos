@@ -26,6 +26,12 @@ import type {
   DatasetInstanceCreate,
   DatasetInstanceUpdate,
   DatasetInstanceStatus,
+  DatasetInstanceRole,
+  DatasetInstanceEnvironment,
+} from '@/types/dataset';
+import {
+  DATASET_INSTANCE_ROLE_LABELS,
+  DATASET_INSTANCE_ENVIRONMENT_LABELS,
 } from '@/types/dataset';
 import {
   Tooltip,
@@ -61,6 +67,9 @@ interface FormData {
   contract_id: string;
   contract_server_id: string;
   physical_path: string;
+  role: DatasetInstanceRole;
+  display_name: string;
+  environment: DatasetInstanceEnvironment | '';
   status: DatasetInstanceStatus;
   notes: string;
 }
@@ -92,6 +101,9 @@ export default function DatasetInstanceFormDialog({
       contract_id: '',
       contract_server_id: '',
       physical_path: '',
+      role: 'main',
+      display_name: '',
+      environment: '',
       status: 'active',
       notes: '',
     },
@@ -158,6 +170,9 @@ export default function DatasetInstanceFormDialog({
           contract_id: instance.contract_id || '',
           contract_server_id: instance.contract_server_id || '',
           physical_path: instance.physical_path,
+          role: (instance.role || 'main') as DatasetInstanceRole,
+          display_name: instance.display_name || '',
+          environment: (instance.environment || '') as DatasetInstanceEnvironment | '',
           status: instance.status as DatasetInstanceStatus,
           notes: instance.notes || '',
         });
@@ -166,6 +181,9 @@ export default function DatasetInstanceFormDialog({
           contract_id: '',
           contract_server_id: '',
           physical_path: '',
+          role: 'main',
+          display_name: '',
+          environment: '',
           status: 'active',
           notes: '',
         });
@@ -181,6 +199,9 @@ export default function DatasetInstanceFormDialog({
         contract_id: formData.contract_id || undefined,
         contract_server_id: formData.contract_server_id || undefined,
         physical_path: formData.physical_path,
+        role: formData.role,
+        display_name: formData.display_name || undefined,
+        environment: formData.environment || undefined,
         status: formData.status,
         notes: formData.notes || undefined,
       };
@@ -324,6 +345,68 @@ export default function DatasetInstanceFormDialog({
             <p className="text-xs text-muted-foreground">
               The full path to the object in the target system. Format depends on the system
               type (e.g., catalog.schema.table for Unity Catalog).
+            </p>
+          </div>
+
+          {/* Role and Environment Row */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Role */}
+            <div className="space-y-2">
+              <Label htmlFor="role">Role *</Label>
+              <Select
+                value={watch('role')}
+                onValueChange={(value) => setValue('role', value as DatasetInstanceRole)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(DATASET_INSTANCE_ROLE_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Purpose of this table in the dataset
+              </p>
+            </div>
+
+            {/* Environment */}
+            <div className="space-y-2">
+              <Label htmlFor="environment">Environment</Label>
+              <Select
+                value={watch('environment')}
+                onValueChange={(value) => setValue('environment', value as DatasetInstanceEnvironment)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select environment" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(DATASET_INSTANCE_ENVIRONMENT_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Deployment stage (dev, prod, etc.)
+              </p>
+            </div>
+          </div>
+
+          {/* Display Name */}
+          <div className="space-y-2">
+            <Label htmlFor="display_name">Display Name</Label>
+            <Input
+              id="display_name"
+              placeholder="e.g., Customer Addresses, Countries Lookup"
+              {...register('display_name')}
+            />
+            <p className="text-xs text-muted-foreground">
+              Human-readable name for this table within the dataset
             </p>
           </div>
 

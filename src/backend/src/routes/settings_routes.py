@@ -479,10 +479,13 @@ async def clear_demo_data(
         # UUID patterns use type codes in first 3 hex chars (see demo_data.sql for mapping)
         # Pattern: {type:3}{seq:5}-0000-4000-8000-...
         delete_statements = [
-            # Dataset subscriptions, tags and custom properties (026=subscriptions, 023=tags, 024=custom_properties)
+            # Dataset subscriptions and custom properties (026=subscriptions, 024=custom_properties)
             "DELETE FROM dataset_subscriptions WHERE id::text LIKE '026%'",
-            "DELETE FROM dataset_tags WHERE id::text LIKE '023%'",
             "DELETE FROM dataset_custom_properties WHERE id::text LIKE '024%'",
+            
+            # Dataset and dataset_instance tags via unified entity_tag_associations (029 prefix)
+            "DELETE FROM entity_tag_associations WHERE entity_type = 'dataset_instance' AND entity_id::text LIKE '025%'",
+            "DELETE FROM entity_tag_associations WHERE entity_type = 'dataset' AND entity_id::text LIKE '021%'",
             
             # Dataset instances (025)
             "DELETE FROM dataset_instances WHERE id::text LIKE '025%'",

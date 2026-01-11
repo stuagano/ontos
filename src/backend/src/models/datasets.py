@@ -2,7 +2,8 @@
 Datasets API Models
 
 Pydantic models for Dataset CRUD operations.
-Datasets represent physical implementations of Data Contracts.
+Datasets are logical groupings of related data assets (tables, views).
+Physical implementations are represented by DatasetInstance.
 """
 
 from datetime import datetime
@@ -10,6 +11,8 @@ from enum import Enum
 from typing import List, Optional, Any, Dict
 
 from pydantic import BaseModel, Field
+
+from src.models.tags import AssignedTag, AssignedTagCreate
 
 
 # ============================================================================
@@ -24,23 +27,6 @@ class DatasetStatus(str, Enum):
     RETIRED = "retired"
 
 
-class DatasetAssetType(str, Enum):
-    """Types of Unity Catalog assets that can be datasets."""
-    TABLE = "table"
-    VIEW = "view"
-
-
-class DatasetEnvironment(str, Enum):
-    """SDLC environment stages for datasets."""
-    DEV = "dev"
-    STAGING = "staging"
-    PROD = "prod"
-    # Additional common environments
-    TEST = "test"
-    QA = "qa"
-    UAT = "uat"
-
-
 class DatasetInstanceStatus(str, Enum):
     """Instance lifecycle status values."""
     ACTIVE = "active"
@@ -48,21 +34,23 @@ class DatasetInstanceStatus(str, Enum):
     RETIRED = "retired"
 
 
-# ============================================================================
-# Tag Models
-# ============================================================================
-
-class DatasetTag(BaseModel):
-    """Tag associated with a dataset."""
-    id: Optional[str] = None
-    name: str = Field(..., description="Tag name")
-
-    model_config = {"from_attributes": True}
+class DatasetInstanceRole(str, Enum):
+    """Purpose/role of a dataset instance within the dataset."""
+    MAIN = "main"          # Primary fact table
+    DIMENSION = "dimension"  # Dimension table for main
+    LOOKUP = "lookup"        # Reference/lookup table
+    REFERENCE = "reference"  # External reference data
+    STAGING = "staging"      # Staging/intermediate table
 
 
-class DatasetTagCreate(BaseModel):
-    """Model for creating a tag."""
-    name: str = Field(..., description="Tag name")
+class DatasetInstanceEnvironment(str, Enum):
+    """SDLC environment stages for dataset instances."""
+    DEV = "dev"
+    STAGING = "staging"
+    PROD = "prod"
+    TEST = "test"
+    QA = "qa"
+    UAT = "uat"
 
 
 # ============================================================================
@@ -149,9 +137,17 @@ class DatasetInstance(BaseModel):
     # Physical location
     physical_path: str = Field(..., description="Physical path in the target system (flexible format)")
     
+    # Role and identity within the dataset
+    role: str = Field("main", description="Purpose of this instance (main, dimension, lookup, reference, staging)")
+    display_name: Optional[str] = Field(None, description="Human-readable display name within the dataset")
+    environment: Optional[str] = Field(None, description="Deployment environment (dev, qa, test, staging, prod)")
+    
     # Instance status
     status: str = Field("active", description="Instance status (active, deprecated, retired)")
     notes: Optional[str] = Field(None, description="Notes about this instance")
+    
+    # Tags (from unified tagging system)
+    tags: List[AssignedTag] = Field(default_factory=list, description="Tags assigned to this instance")
     
     # Audit
     created_at: Optional[datetime] = Field(None, description="Creation timestamp")
@@ -167,8 +163,12 @@ class DatasetInstanceCreate(BaseModel):
     contract_id: Optional[str] = Field(None, description="Contract version this instance implements")
     contract_server_id: Optional[str] = Field(None, description="Server entry ID from the contract")
     physical_path: str = Field(..., description="Physical path in the target system")
+    role: str = Field("main", description="Purpose of this instance (main, dimension, lookup, reference, staging)")
+    display_name: Optional[str] = Field(None, description="Human-readable display name within the dataset")
+    environment: Optional[str] = Field(None, description="Deployment environment (dev, qa, test, staging, prod)")
     status: str = Field("active", description="Instance status")
     notes: Optional[str] = Field(None, description="Notes about this instance")
+    tags: Optional[List[AssignedTagCreate]] = Field(None, description="Tags to assign to this instance")
 
 
 class DatasetInstanceUpdate(BaseModel):
@@ -176,8 +176,12 @@ class DatasetInstanceUpdate(BaseModel):
     contract_id: Optional[str] = Field(None, description="Contract version this instance implements")
     contract_server_id: Optional[str] = Field(None, description="Server entry ID from the contract")
     physical_path: Optional[str] = Field(None, description="Physical path in the target system")
+    role: Optional[str] = Field(None, description="Purpose of this instance (main, dimension, lookup, reference, staging)")
+    display_name: Optional[str] = Field(None, description="Human-readable display name within the dataset")
+    environment: Optional[str] = Field(None, description="Deployment environment (dev, qa, test, staging, prod)")
     status: Optional[str] = Field(None, description="Instance status")
     notes: Optional[str] = Field(None, description="Notes about this instance")
+    tags: Optional[List[AssignedTagCreate]] = Field(None, description="Tags to assign to this instance")
 
 
 class DatasetInstanceListResponse(BaseModel):
@@ -195,22 +199,30 @@ class DatasetListItem(BaseModel):
     """Lightweight dataset representation for list views."""
     id: str = Field(..., description="Unique identifier")
     name: str = Field(..., description="Dataset name")
-    asset_type: str = Field(..., description="Asset type (table/view)")
-    catalog_name: str = Field(..., description="Unity Catalog name")
-    schema_name: str = Field(..., description="Schema name")
-    object_name: str = Field(..., description="Object name (table/view)")
-    full_path: Optional[str] = Field(None, description="Full Unity Catalog path")
-    environment: str = Field(..., description="SDLC environment")
+    description: Optional[str] = Field(None, description="Dataset description")
+    
+    # Lifecycle
     status: str = Field(..., description="Lifecycle status")
+    version: Optional[str] = Field(None, description="Version")
     published: bool = Field(False, description="Marketplace publication status")
+    
+    # Contract reference
     contract_id: Optional[str] = Field(None, description="Associated contract ID")
     contract_name: Optional[str] = Field(None, description="Associated contract name")
+    
+    # Ownership
     owner_team_id: Optional[str] = Field(None, description="Owner team ID")
     owner_team_name: Optional[str] = Field(None, description="Owner team name")
-    created_at: Optional[datetime] = Field(None, description="Creation timestamp")
-    updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
+    project_id: Optional[str] = Field(None, description="Project ID")
+    project_name: Optional[str] = Field(None, description="Project name")
+    
+    # Counts
     subscriber_count: Optional[int] = Field(None, description="Number of subscribers")
     instance_count: Optional[int] = Field(None, description="Number of physical instances")
+    
+    # Audit
+    created_at: Optional[datetime] = Field(None, description="Creation timestamp")
+    updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
 
     model_config = {"from_attributes": True}
 
@@ -220,21 +232,17 @@ class DatasetListItem(BaseModel):
 # ============================================================================
 
 class Dataset(BaseModel):
-    """Full dataset model with all details."""
+    """
+    Full dataset model with all details.
+    
+    A Dataset is a logical grouping of related data assets.
+    Physical implementations are represented by DatasetInstance objects.
+    """
     id: str = Field(..., description="Unique identifier")
     name: str = Field(..., description="Dataset name")
     description: Optional[str] = Field(None, description="Dataset description")
     
-    # Physical asset reference
-    asset_type: str = Field(..., description="Asset type (table/view)")
-    catalog_name: str = Field(..., description="Unity Catalog name")
-    schema_name: str = Field(..., description="Schema name")
-    object_name: str = Field(..., description="Object name (table/view)")
-    
-    # SDLC environment
-    environment: str = Field(..., description="SDLC environment (dev/staging/prod)")
-    
-    # Contract reference
+    # Contract reference (optional default contract for the dataset)
     contract_id: Optional[str] = Field(None, description="Associated contract ID")
     contract_name: Optional[str] = Field(None, description="Associated contract name (denormalized)")
     
@@ -253,7 +261,7 @@ class Dataset(BaseModel):
     max_level_inheritance: int = Field(99, ge=0, le=999, description="Maximum metadata level to inherit from contracts")
     
     # Related data
-    tags: List[DatasetTag] = Field(default_factory=list, description="Tags")
+    tags: List[AssignedTag] = Field(default_factory=list, description="Tags (from unified tagging system)")
     custom_properties: List[DatasetCustomProperty] = Field(default_factory=list, description="Custom properties")
     instances: List[DatasetInstance] = Field(default_factory=list, description="Physical instances")
     subscriber_count: Optional[int] = Field(None, description="Number of subscribers")
@@ -267,31 +275,21 @@ class Dataset(BaseModel):
 
     model_config = {"from_attributes": True}
 
-    @property
-    def full_path(self) -> str:
-        """Returns the full Unity Catalog path."""
-        return f"{self.catalog_name}.{self.schema_name}.{self.object_name}"
-
 
 # ============================================================================
 # Create/Update Models
 # ============================================================================
 
 class DatasetCreate(BaseModel):
-    """Model for creating a new dataset."""
+    """
+    Model for creating a new dataset.
+    
+    A Dataset is a logical grouping - physical assets are added as instances later.
+    """
     name: str = Field(..., description="Dataset name")
     description: Optional[str] = Field(None, description="Dataset description")
     
-    # Physical asset reference
-    asset_type: str = Field(..., description="Asset type (table/view)")
-    catalog_name: str = Field(..., description="Unity Catalog name")
-    schema_name: str = Field(..., description="Schema name")
-    object_name: str = Field(..., description="Object name (table/view)")
-    
-    # SDLC environment
-    environment: str = Field(..., description="SDLC environment (dev/staging/prod)")
-    
-    # Contract reference
+    # Contract reference (optional default contract)
     contract_id: Optional[str] = Field(None, description="Associated contract ID")
     
     # Ownership and project
@@ -306,8 +304,8 @@ class DatasetCreate(BaseModel):
     # Metadata inheritance
     max_level_inheritance: int = Field(99, ge=0, le=999, description="Maximum metadata level to inherit from contracts")
     
-    # Optional related data
-    tags: Optional[List[DatasetTagCreate]] = Field(None, description="Tags to create")
+    # Optional related data (uses unified tagging system)
+    tags: Optional[List[AssignedTagCreate]] = Field(None, description="Tags to assign (via unified tagging system)")
     custom_properties: Optional[List[DatasetCustomPropertyCreate]] = Field(None, description="Custom properties")
 
     model_config = {"from_attributes": True}
@@ -317,15 +315,6 @@ class DatasetUpdate(BaseModel):
     """Model for updating an existing dataset."""
     name: Optional[str] = Field(None, description="Dataset name")
     description: Optional[str] = Field(None, description="Dataset description")
-    
-    # Physical asset reference (can be updated if asset is moved)
-    asset_type: Optional[str] = Field(None, description="Asset type (table/view)")
-    catalog_name: Optional[str] = Field(None, description="Unity Catalog name")
-    schema_name: Optional[str] = Field(None, description="Schema name")
-    object_name: Optional[str] = Field(None, description="Object name (table/view)")
-    
-    # SDLC environment
-    environment: Optional[str] = Field(None, description="SDLC environment")
     
     # Contract reference
     contract_id: Optional[str] = Field(None, description="Associated contract ID")
@@ -343,7 +332,7 @@ class DatasetUpdate(BaseModel):
     max_level_inheritance: Optional[int] = Field(None, ge=0, le=999, description="Maximum metadata level to inherit from contracts")
     
     # Optional related data (replaces existing if provided)
-    tags: Optional[List[DatasetTagCreate]] = Field(None, description="Tags to set")
+    tags: Optional[List[AssignedTagCreate]] = Field(None, description="Tags to assign (via unified tagging system)")
     custom_properties: Optional[List[DatasetCustomPropertyCreate]] = Field(None, description="Custom properties")
 
     model_config = {"from_attributes": True}
@@ -355,13 +344,10 @@ class DatasetUpdate(BaseModel):
 
 class DatasetFilter(BaseModel):
     """Filter options for querying datasets."""
-    environment: Optional[str] = Field(None, description="Filter by environment")
     status: Optional[str] = Field(None, description="Filter by status")
-    asset_type: Optional[str] = Field(None, description="Filter by asset type")
     contract_id: Optional[str] = Field(None, description="Filter by contract")
     owner_team_id: Optional[str] = Field(None, description="Filter by owner team")
     project_id: Optional[str] = Field(None, description="Filter by project")
     published: Optional[bool] = Field(None, description="Filter by publication status")
-    catalog_name: Optional[str] = Field(None, description="Filter by catalog")
     search: Optional[str] = Field(None, description="Search in name and description")
 

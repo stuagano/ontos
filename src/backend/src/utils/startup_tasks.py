@@ -239,9 +239,9 @@ def initialize_managers(app: FastAPI):
             app.state.data_contracts_manager = DataContractsManager(data_dir=data_dir, tags_manager=tags_manager)
             logger.info("DataContractsManager initialized with TagsManager integration.")
             
-            # Instantiate DatasetsManager
-            app.state.datasets_manager = DatasetsManager(db=db_session, ws_client=ws_client)
-            logger.info("DatasetsManager initialized.")
+            # Instantiate DatasetsManager with TagsManager dependency
+            app.state.datasets_manager = DatasetsManager(db=db_session, ws_client=ws_client, tags_manager=tags_manager)
+            logger.info("DatasetsManager initialized with TagsManager integration.")
 
             # Ensure default tag namespace exists (using a new session for this setup task)
             with session_factory() as setup_db:

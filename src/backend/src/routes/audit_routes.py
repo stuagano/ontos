@@ -8,10 +8,10 @@ from src.common.authorization import PermissionChecker
 from src.common.features import FeatureAccessLevel
 from src.models.audit_log import PaginatedAuditLogResponse
 
-router = APIRouter(prefix="/api", tags=["Audit Trail"])
+router = APIRouter(prefix="/api/audit", tags=["Audit Trail"])
 
 @router.get(
-    "/audit",
+    "/",
     response_model=PaginatedAuditLogResponse,
 )
 async def get_audit_trail(

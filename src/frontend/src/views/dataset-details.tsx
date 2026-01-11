@@ -3,7 +3,6 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -21,16 +20,12 @@ import {
   Pencil,
   Trash2,
   AlertCircle,
-  HardDrive,
+  Table2,
   FileText,
   Users,
   Bell,
   BellOff,
   ExternalLink,
-  Tag,
-  Calendar,
-  User,
-  FolderOpen,
   Rocket,
   XCircle,
   Loader2,
@@ -44,22 +39,23 @@ import {
 import type {
   Dataset,
   DatasetStatus,
-  DatasetEnvironment,
-  DatasetAssetType,
   DatasetSubscriptionResponse,
   DatasetSubscribersListResponse,
   DatasetInstance,
   DatasetInstanceListResponse,
+  DatasetInstanceEnvironment,
 } from '@/types/dataset';
 import {
   DATASET_STATUS_LABELS,
   DATASET_STATUS_COLORS,
-  DATASET_ENVIRONMENT_LABELS,
-  DATASET_ENVIRONMENT_COLORS,
-  DATASET_ASSET_TYPE_LABELS,
   DATASET_INSTANCE_STATUS_LABELS,
   DATASET_INSTANCE_STATUS_COLORS,
+  DATASET_INSTANCE_ROLE_LABELS,
+  DATASET_INSTANCE_ROLE_COLORS,
+  DATASET_INSTANCE_ENVIRONMENT_LABELS,
+  DATASET_INSTANCE_ENVIRONMENT_COLORS,
 } from '@/types/dataset';
+import type { DatasetInstanceRole } from '@/types/dataset';
 import type { DatasetInstanceStatus } from '@/types/dataset';
 import { RelativeDate } from '@/components/common/relative-date';
 import DatasetFormDialog from '@/components/datasets/dataset-form-dialog';
@@ -71,7 +67,7 @@ import ConceptSelectDialog from '@/components/semantic/concept-select-dialog';
 import LinkedConceptChips from '@/components/semantic/linked-concept-chips';
 import type { EntitySemanticLink } from '@/types/semantic-link';
 import { Label } from '@/components/ui/label';
-import { Plus, MessageSquare, Server, Database } from 'lucide-react';
+import { Plus, Server } from 'lucide-react';
 
 export default function DatasetDetails() {
   const { datasetId } = useParams<{ datasetId: string }>();
@@ -205,7 +201,7 @@ export default function DatasetDetails() {
 
   useEffect(() => {
     // Set breadcrumbs
-    setStaticSegments([{ label: 'Datasets', href: '/datasets' }]);
+    setStaticSegments([{ label: 'Datasets', path: '/datasets' }]);
     setDynamicTitle(dataset?.name || 'Loading...');
 
     return () => {
@@ -417,7 +413,7 @@ export default function DatasetDetails() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-6 space-y-6">
+      <div className="py-6 space-y-6">
         <div className="flex items-center gap-4">
           <Skeleton className="h-10 w-10" />
           <div className="space-y-2">
@@ -432,10 +428,10 @@ export default function DatasetDetails() {
 
   if (error || !dataset) {
     return (
-      <div className="container mx-auto py-6 space-y-6">
-        <Button variant="ghost" onClick={() => navigate('/datasets')}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Datasets
+      <div className="py-6 space-y-6">
+        <Button variant="outline" size="sm" onClick={() => navigate('/datasets')}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to List
         </Button>
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -446,41 +442,15 @@ export default function DatasetDetails() {
   }
 
   const status = dataset.status as DatasetStatus;
-  const environment = dataset.environment as DatasetEnvironment;
-  const assetType = dataset.asset_type as DatasetAssetType;
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="py-6 space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/datasets')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">{dataset.name}</h1>
-              <Badge
-                variant="outline"
-                className={DATASET_STATUS_COLORS[status] || 'bg-gray-100'}
-              >
-                {DATASET_STATUS_LABELS[status] || status}
-              </Badge>
-              <Badge
-                variant="outline"
-                className={DATASET_ENVIRONMENT_COLORS[environment] || 'bg-gray-100'}
-              >
-                {DATASET_ENVIRONMENT_LABELS[environment] || environment}
-              </Badge>
-              {dataset.published && (
-                <Badge variant="secondary">Published</Badge>
-              )}
-            </div>
-            {dataset.description && (
-              <p className="text-muted-foreground mt-1">{dataset.description}</p>
-            )}
-          </div>
-        </div>
+      <div className="flex items-center justify-between">
+        <Button variant="outline" size="sm" onClick={() => navigate('/datasets')}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to List
+        </Button>
         <div className="flex items-center gap-2">
           <CommentSidebar
             entityType="dataset"
@@ -542,407 +512,409 @@ export default function DatasetDetails() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Asset Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <HardDrive className="h-5 w-5" />
-                Asset Information
-              </CardTitle>
-              <CardDescription>
-                Unity Catalog location for this dataset
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Asset Type
-                  </label>
-                  <p className="text-sm">
-                    {DATASET_ASSET_TYPE_LABELS[assetType] || assetType}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Version
-                  </label>
-                  <p className="text-sm">{dataset.version || '-'}</p>
-                </div>
-              </div>
-              <Separator />
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">
-                  Full Path
-                </label>
-                <p className="font-mono text-sm bg-muted p-2 rounded mt-1">
-                  {dataset.catalog_name}.{dataset.schema_name}.{dataset.object_name}
-                </p>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Catalog
-                  </label>
-                  <p className="text-sm font-mono">{dataset.catalog_name}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Schema
-                  </label>
-                  <p className="text-sm font-mono">{dataset.schema_name}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Object
-                  </label>
-                  <p className="text-sm font-mono">{dataset.object_name}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Contract Link */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Data Contract
-              </CardTitle>
-              <CardDescription>
-                The contract this dataset implements
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {dataset.contract_id ? (
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium">{dataset.contract_name || 'Linked Contract'}</p>
-                    <p className="text-sm text-muted-foreground">
-                      This dataset implements the schema and quality requirements from this contract
-                    </p>
-                  </div>
-                  <Button variant="outline" asChild>
-                    <Link to={`/data-contracts/${dataset.contract_id}`}>
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      View Contract
-                    </Link>
-                  </Button>
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No contract assigned</p>
-                  <p className="text-sm">
-                    Assign a contract to define schema and quality requirements
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Physical Instances */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Server className="h-5 w-5" />
-                    Physical Instances
-                    {instances.length > 0 && (
-                      <Badge variant="secondary">{instances.length}</Badge>
-                    )}
-                  </CardTitle>
-                  <CardDescription>
-                    Physical implementations across different systems and environments
-                  </CardDescription>
-                </div>
-                <Button variant="outline" size="sm" onClick={handleAddInstance}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Instance
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {instancesLoading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                </div>
-              ) : instances.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>System</TableHead>
-                      <TableHead>Environment</TableHead>
-                      <TableHead>Physical Path</TableHead>
-                      <TableHead>Contract Version</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {instances.map((instance) => {
-                      const instStatus = instance.status as DatasetInstanceStatus;
-                      return (
-                        <TableRow key={instance.id}>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Database className="h-4 w-4 text-muted-foreground" />
-                              <span className="capitalize">
-                                {instance.server_type || 'Unknown'}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="capitalize">
-                              {instance.server_environment || '-'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <code className="text-sm bg-muted px-2 py-1 rounded">
-                              {instance.physical_path}
-                            </code>
-                          </TableCell>
-                          <TableCell>
-                            {instance.contract_name ? (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Link
-                                      to={`/data-contracts/${instance.contract_id}`}
-                                      className="text-sm hover:underline text-blue-600 dark:text-blue-400"
-                                    >
-                                      {instance.contract_version || 'View'}
-                                    </Link>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>{instance.contract_name}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={DATASET_INSTANCE_STATUS_COLORS[instStatus] || 'bg-gray-100'}
-                            >
-                              {DATASET_INSTANCE_STATUS_LABELS[instStatus] || instStatus}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleEditInstance(instance)}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDeleteInstance(instance.id)}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Server className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No physical instances</p>
-                  <p className="text-sm">
-                    Add instances to track where this dataset is physically implemented
-                  </p>
-                  <Button variant="outline" size="sm" className="mt-4" onClick={handleAddInstance}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add First Instance
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Subscribers */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
-                Subscribers
-                {subscribers && (
-                  <Badge variant="secondary">{subscribers.subscriber_count}</Badge>
-                )}
-              </CardTitle>
-              <CardDescription>
-                Users receiving updates about this dataset
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {subscribers && subscribers.subscribers.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Subscribed</TableHead>
-                      <TableHead>Reason</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {subscribers.subscribers.map((sub, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell>{sub.email}</TableCell>
-                        <TableCell>
-                          <RelativeDate date={sub.subscribed_at} />
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {sub.reason || '-'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No subscribers yet</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Ownership */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Ownership</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <label className="text-xs text-muted-foreground">Owner Team</label>
-                  <p className="text-sm">{dataset.owner_team_name || 'Not assigned'}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <FolderOpen className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <label className="text-xs text-muted-foreground">Project</label>
-                  <p className="text-sm">{dataset.project_name || 'Not assigned'}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Tags */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Tag className="h-4 w-4" />
-                Tags
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {dataset.tags && dataset.tags.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {dataset.tags.map((tag, idx) => (
-                    <TagChip key={idx} tag={tag.name} size="sm" />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No tags</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Semantic Links / Business Concepts */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm">Business Concepts</CardTitle>
-                <Button
-                  size="sm"
+      {/* Core Metadata Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold flex items-center">
+            <Table2 className="mr-3 h-7 w-7 text-primary" />
+            {dataset.name}
+          </CardTitle>
+          <CardDescription className="pt-1">
+            {dataset.description || 'No description provided'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid md:grid-cols-3 gap-x-6 gap-y-2">
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-muted-foreground min-w-[4rem]">Status:</Label>
+              <div className="flex items-center gap-1.5">
+                <Badge
                   variant="outline"
-                  onClick={() => setConceptDialogOpen(true)}
-                  className="h-7"
+                  className={DATASET_STATUS_COLORS[status] || 'bg-gray-100'}
                 >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Add
-                </Button>
+                  {DATASET_STATUS_LABELS[status] || status}
+                </Badge>
+                {dataset.published && (
+                  <Badge variant="default" className="bg-green-600 text-xs">Published</Badge>
+                )}
               </div>
-            </CardHeader>
-            <CardContent>
-              {semanticLinks.length > 0 ? (
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-muted-foreground min-w-[4rem]">Version:</Label>
+              <Badge variant="outline" className="text-xs">{dataset.version || 'N/A'}</Badge>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-muted-foreground min-w-[4rem]">Owner:</Label>
+              {dataset.owner_team_id && dataset.owner_team_name ? (
+                <span
+                  className="text-xs cursor-pointer text-primary hover:underline truncate"
+                  onClick={() => navigate(`/teams/${dataset.owner_team_id}`)}
+                  title={`Team ID: ${dataset.owner_team_id}`}
+                >
+                  {dataset.owner_team_name}
+                </span>
+              ) : (
+                <span className="text-xs text-muted-foreground">{dataset.owner_team_name || 'Not assigned'}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-muted-foreground min-w-[4rem]">Project:</Label>
+              {dataset.project_id && dataset.project_name ? (
+                <span
+                  className="text-xs cursor-pointer text-primary hover:underline truncate"
+                  onClick={() => navigate(`/projects/${dataset.project_id}`)}
+                  title={`Project ID: ${dataset.project_id}`}
+                >
+                  {dataset.project_name}
+                </span>
+              ) : (
+                <span className="text-xs text-muted-foreground">{dataset.project_name || 'Not assigned'}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-muted-foreground min-w-[4rem]">Created:</Label>
+              <span className="text-xs text-muted-foreground truncate">
+                <RelativeDate date={dataset.created_at} />
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-muted-foreground min-w-[4rem]">Updated:</Label>
+              <span className="text-xs text-muted-foreground truncate">
+                <RelativeDate date={dataset.updated_at} />
+              </span>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1 min-w-0">
+                <Label className="text-xs text-muted-foreground mb-1.5 block">Tags:</Label>
+                <div className="flex flex-wrap gap-1">
+                  {dataset.tags && dataset.tags.length > 0 ? (
+                    dataset.tags.map((tag, idx) => (
+                      <TagChip key={idx} tag={tag} size="sm" />
+                    ))
+                  ) : (
+                    <span className="text-xs text-muted-foreground">No tags</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <Label className="text-xs text-muted-foreground mb-1.5 block">Linked Business Concepts:</Label>
                 <LinkedConceptChips
                   links={semanticLinks}
                   onRemove={(id) => removeSemanticLink(id)}
+                  trailing={<Button size="sm" variant="outline" onClick={() => setConceptDialogOpen(true)} className="h-6 text-xs">Add</Button>}
                 />
-              ) : (
-                <p className="text-sm text-muted-foreground">No linked concepts</p>
-              )}
-            </CardContent>
-          </Card>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-          {/* Audit Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Audit</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <label className="text-xs text-muted-foreground">Created</label>
-                  <p className="text-sm">
-                    <RelativeDate date={dataset.created_at} />
-                  </p>
-                </div>
+      {/* Dataset Overview */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Table2 className="h-5 w-5" />
+            Dataset Overview
+          </CardTitle>
+          <CardDescription>
+            Version and instance information
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-muted-foreground">
+                Version
+              </label>
+              <p className="text-sm">{dataset.version || '-'}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-muted-foreground">
+                Physical Instances
+              </label>
+              <p className="text-sm">
+                {dataset.instance_count || 0} instance{(dataset.instance_count || 0) !== 1 ? 's' : ''}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Contract Link */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Data Contract
+          </CardTitle>
+          <CardDescription>
+            The contract this dataset implements
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {dataset.contract_id ? (
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div>
+                <p className="font-medium">{dataset.contract_name || 'Linked Contract'}</p>
+                <p className="text-sm text-muted-foreground">
+                  This dataset implements the schema and quality requirements from this contract
+                </p>
               </div>
-              <div className="flex items-center gap-3">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <label className="text-xs text-muted-foreground">Updated</label>
-                  <p className="text-sm">
-                    <RelativeDate date={dataset.updated_at} />
-                  </p>
-                </div>
-              </div>
-              {dataset.created_by && (
-                <div className="flex items-center gap-3">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <label className="text-xs text-muted-foreground">Created by</label>
-                    <p className="text-sm">{dataset.created_by}</p>
+              <Button variant="outline" asChild>
+                <Link to={`/data-contracts/${dataset.contract_id}`}>
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  View Contract
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p>No contract assigned</p>
+              <p className="text-sm">
+                Assign a contract to define schema and quality requirements
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Physical Instances */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Server className="h-5 w-5" />
+                Physical Instances
+                {instances.length > 0 && (
+                  <Badge variant="secondary">{instances.length}</Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Physical implementations across different systems and environments
+              </CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleAddInstance}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Instance
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {instancesLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : instances.length > 0 ? (
+            <div className="space-y-4">
+              {/* Group instances by role */}
+              {(['main', 'dimension', 'lookup', 'reference', 'staging'] as DatasetInstanceRole[]).map((role) => {
+                const roleInstances = instances.filter((i) => (i.role || 'main') === role);
+                if (roleInstances.length === 0) return null;
+                
+                return (
+                  <div key={role} className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant="outline"
+                        className={DATASET_INSTANCE_ROLE_COLORS[role] || 'bg-gray-100'}
+                      >
+                        {DATASET_INSTANCE_ROLE_LABELS[role] || role}
+                      </Badge>
+                      <span className="text-sm text-muted-foreground">
+                        ({roleInstances.length})
+                      </span>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Environment</TableHead>
+                          <TableHead>Physical Path</TableHead>
+                          <TableHead>Contract</TableHead>
+                          <TableHead>Tags</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {roleInstances.map((instance) => {
+                          const instStatus = instance.status as DatasetInstanceStatus;
+                          const instEnv = instance.environment as DatasetInstanceEnvironment | undefined;
+                          return (
+                            <TableRow key={instance.id}>
+                              <TableCell>
+                                <div className="flex flex-col">
+                                  <span className="font-medium">
+                                    {instance.display_name || instance.physical_path.split('.').pop()}
+                                  </span>
+                                  {instance.server_type && (
+                                    <span className="text-xs text-muted-foreground capitalize">
+                                      {instance.server_type}
+                                    </span>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {instEnv ? (
+                                  <Badge
+                                    variant="outline"
+                                    className={DATASET_INSTANCE_ENVIRONMENT_COLORS[instEnv] || 'bg-gray-100'}
+                                  >
+                                    {DATASET_INSTANCE_ENVIRONMENT_LABELS[instEnv] || instEnv}
+                                  </Badge>
+                                ) : instance.server_environment ? (
+                                  <Badge variant="outline" className="capitalize">
+                                    {instance.server_environment}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <code className="text-sm bg-muted px-2 py-1 rounded">
+                                  {instance.physical_path}
+                                </code>
+                              </TableCell>
+                              <TableCell>
+                                {instance.contract_name ? (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Link
+                                          to={`/data-contracts/${instance.contract_id}`}
+                                          className="text-sm hover:underline text-blue-600 dark:text-blue-400"
+                                        >
+                                          v{instance.contract_version || '-'}
+                                        </Link>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>{instance.contract_name}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {instance.tags && instance.tags.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {instance.tags.slice(0, 3).map((tag, idx) => (
+                                      <TagChip key={idx} tag={tag} size="sm" />
+                                    ))}
+                                    {instance.tags.length > 3 && (
+                                      <span className="text-xs text-muted-foreground">
+                                        +{instance.tags.length - 3}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant="outline"
+                                  className={DATASET_INSTANCE_STATUS_COLORS[instStatus] || 'bg-gray-100'}
+                                >
+                                  {DATASET_INSTANCE_STATUS_LABELS[instStatus] || instStatus}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleEditInstance(instance)}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleDeleteInstance(instance.id)}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
                   </div>
-                </div>
-              )}
-              {dataset.updated_by && (
-                <div className="flex items-center gap-3">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <label className="text-xs text-muted-foreground">Updated by</label>
-                    <p className="text-sm">{dataset.updated_by}</p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Server className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p>No physical instances</p>
+              <p className="text-sm">
+                Add instances to track where this dataset is physically implemented
+              </p>
+              <Button variant="outline" size="sm" className="mt-4" onClick={handleAddInstance}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add First Instance
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Subscribers */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            Subscribers
+            {subscribers && (
+              <Badge variant="secondary">{subscribers.subscriber_count}</Badge>
+            )}
+          </CardTitle>
+          <CardDescription>
+            Users receiving updates about this dataset
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {subscribers && subscribers.subscribers.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Subscribed</TableHead>
+                  <TableHead>Reason</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {subscribers.subscribers.map((sub, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell>{sub.email}</TableCell>
+                    <TableCell>
+                      <RelativeDate date={sub.subscribed_at} />
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {sub.reason || '-'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p>No subscribers yet</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Metadata Panel - Rich texts, links, documents */}
       {datasetId && (

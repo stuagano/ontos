@@ -944,24 +944,26 @@ ON CONFLICT (id) DO NOTHING;
 -- ============================================================================
 -- 15. DATASETS (type=021)
 -- ============================================================================
--- Physical implementations of data contracts
+-- Logical groupings of related data assets
+-- Physical fields (asset_type, catalog_name, schema_name, object_name, environment) are deprecated
+-- and set to NULL. Physical implementations are now managed via dataset_instances.
 
 INSERT INTO datasets (id, name, description, asset_type, catalog_name, schema_name, object_name, environment, contract_id, owner_team_id, project_id, status, version, published, max_level_inheritance, created_by, updated_by, created_at, updated_at) VALUES
 -- Customer datasets
-('02100001-0000-4000-8000-000000000001', 'Customer Master - Production', 'Production customer master data implementing the Customer Data Contract', 'table', 'prod_catalog', 'crm', 'customers_master', 'prod', '00400001-0000-4000-8000-000000000001', '00100001-0000-4000-8000-000000000001', '00300001-0000-4000-8000-000000000001', 'active', '1.0.0', true, 99, 'system@demo', 'system@demo', NOW(), NOW()),
-('02100002-0000-4000-8000-000000000002', 'Customer Master - Development', 'Development customer data for testing', 'table', 'dev_catalog', 'crm', 'customers_master', 'dev', '00400001-0000-4000-8000-000000000001', '00100001-0000-4000-8000-000000000001', '00300001-0000-4000-8000-000000000001', 'active', '2.0.0-draft', false, 99, 'system@demo', 'system@demo', NOW(), NOW()),
-('02100003-0000-4000-8000-000000000003', 'Customer Preferences View', 'Aggregated customer preferences view', 'view', 'prod_catalog', 'crm', 'v_customer_preferences', 'prod', '00400001-0000-4000-8000-000000000001', '00100002-0000-4000-8000-000000000002', '00300001-0000-4000-8000-000000000001', 'active', '1.0.0', true, 99, 'system@demo', 'system@demo', NOW(), NOW()),
+('02100001-0000-4000-8000-000000000001', 'Customer Master Data', 'Customer master data including profiles, preferences, and segmentation', NULL, NULL, NULL, NULL, NULL, '00400001-0000-4000-8000-000000000001', '00100001-0000-4000-8000-000000000001', '00300001-0000-4000-8000-000000000001', 'active', '1.0.0', true, 99, 'system@demo', 'system@demo', NOW(), NOW()),
+('02100002-0000-4000-8000-000000000002', 'Customer Engagement Analytics', 'Customer engagement metrics and preferences aggregation', NULL, NULL, NULL, NULL, NULL, '00400001-0000-4000-8000-000000000001', '00100001-0000-4000-8000-000000000001', '00300001-0000-4000-8000-000000000001', 'active', '2.0.0', false, 99, 'system@demo', 'system@demo', NOW(), NOW()),
+('02100003-0000-4000-8000-000000000003', 'Customer Preferences', 'Aggregated customer preferences across channels', NULL, NULL, NULL, NULL, NULL, '00400001-0000-4000-8000-000000000001', '00100002-0000-4000-8000-000000000002', '00300001-0000-4000-8000-000000000001', 'active', '1.0.0', true, 99, 'system@demo', 'system@demo', NOW(), NOW()),
 
 -- IoT datasets
-('02100004-0000-4000-8000-000000000004', 'IoT Device Registry', 'Production registry of all IoT devices', 'table', 'iot_catalog', 'devices', 'device_registry', 'prod', '00400004-0000-4000-8000-000000000004', '00100003-0000-4000-8000-000000000003', '00300003-0000-4000-8000-000000000003', 'active', '1.1.0', true, 99, 'system@demo', 'system@demo', NOW(), NOW()),
-('02100005-0000-4000-8000-000000000005', 'IoT Telemetry Stream', 'Real-time telemetry data from IoT devices', 'table', 'iot_catalog', 'telemetry', 'device_readings', 'prod', '00400004-0000-4000-8000-000000000004', '00100003-0000-4000-8000-000000000003', '00300003-0000-4000-8000-000000000003', 'active', '1.1.0', true, 99, 'system@demo', 'system@demo', NOW(), NOW()),
+('02100004-0000-4000-8000-000000000004', 'IoT Device Management', 'Registry and management of all IoT devices and configurations', NULL, NULL, NULL, NULL, NULL, '00400004-0000-4000-8000-000000000004', '00100003-0000-4000-8000-000000000003', '00300003-0000-4000-8000-000000000003', 'active', '1.1.0', true, 99, 'system@demo', 'system@demo', NOW(), NOW()),
+('02100005-0000-4000-8000-000000000005', 'IoT Telemetry', 'Real-time and historical telemetry data from IoT devices', NULL, NULL, NULL, NULL, NULL, '00400004-0000-4000-8000-000000000004', '00100003-0000-4000-8000-000000000003', '00300003-0000-4000-8000-000000000003', 'active', '1.1.0', true, 99, 'system@demo', 'system@demo', NOW(), NOW()),
 
 -- Financial datasets
-('02100006-0000-4000-8000-000000000006', 'Financial Transactions - Draft', 'Draft financial transactions dataset for testing', 'table', 'finance_dev', 'transactions', 'daily_transactions', 'dev', '00400006-0000-4000-8000-000000000006', '00100004-0000-4000-8000-000000000004', '00300002-0000-4000-8000-000000000002', 'draft', '1.0.0-alpha', false, 99, 'system@demo', 'system@demo', NOW(), NOW()),
+('02100006-0000-4000-8000-000000000006', 'Financial Transactions', 'Daily financial transactions for analytics and reporting', NULL, NULL, NULL, NULL, NULL, '00400006-0000-4000-8000-000000000006', '00100004-0000-4000-8000-000000000004', '00300002-0000-4000-8000-000000000002', 'draft', '1.0.0-alpha', false, 99, 'system@demo', 'system@demo', NOW(), NOW()),
 
 -- Retail/Analytics datasets
-('02100007-0000-4000-8000-000000000007', 'Sales Analytics Summary', 'Aggregated sales analytics for BI dashboards', 'view', 'analytics_catalog', 'retail', 'v_sales_summary', 'prod', NULL, '00100002-0000-4000-8000-000000000002', '00300005-0000-4000-8000-000000000005', 'active', '2.0.0', true, 99, 'system@demo', 'system@demo', NOW(), NOW()),
-('02100008-0000-4000-8000-000000000008', 'Inventory Levels', 'Current inventory levels across warehouses', 'table', 'analytics_catalog', 'supply_chain', 'inventory_current', 'prod', '00400007-0000-4000-8000-000000000007', '00100001-0000-4000-8000-000000000001', '00300005-0000-4000-8000-000000000005', 'deprecated', '1.2.0', false, 99, 'system@demo', 'system@demo', NOW(), NOW())
+('02100007-0000-4000-8000-000000000007', 'Sales Analytics', 'Aggregated sales analytics for BI dashboards and reporting', NULL, NULL, NULL, NULL, NULL, NULL, '00100002-0000-4000-8000-000000000002', '00300005-0000-4000-8000-000000000005', 'active', '2.0.0', true, 99, 'system@demo', 'system@demo', NOW(), NOW()),
+('02100008-0000-4000-8000-000000000008', 'Inventory Levels', 'Current inventory levels across warehouses and regions', NULL, NULL, NULL, NULL, NULL, '00400007-0000-4000-8000-000000000007', '00100001-0000-4000-8000-000000000001', '00300005-0000-4000-8000-000000000005', 'deprecated', '1.2.0', false, 99, 'system@demo', 'system@demo', NOW(), NOW())
 
 ON CONFLICT (id) DO NOTHING;
 
@@ -987,33 +989,10 @@ ON CONFLICT (id) DO NOTHING;
 
 
 -- ============================================================================
--- 15c. DATASET TAGS (type=023)
+-- 15c. DATASET TAGS
 -- ============================================================================
-
-INSERT INTO dataset_tags (id, dataset_id, name) VALUES
--- Customer Master - Production tags
-('02300001-0000-4000-8000-000000000001', '02100001-0000-4000-8000-000000000001', 'pii'),
-('02300002-0000-4000-8000-000000000002', '02100001-0000-4000-8000-000000000001', 'gdpr'),
-('02300003-0000-4000-8000-000000000003', '02100001-0000-4000-8000-000000000001', 'customer-360'),
-('02300004-0000-4000-8000-000000000004', '02100001-0000-4000-8000-000000000001', 'gold-tier'),
-
--- Customer Master - Development tags
-('02300005-0000-4000-8000-000000000005', '02100002-0000-4000-8000-000000000002', 'test-data'),
-('02300006-0000-4000-8000-000000000006', '02100002-0000-4000-8000-000000000002', 'synthetic'),
-
--- IoT datasets tags
-('02300007-0000-4000-8000-000000000007', '02100004-0000-4000-8000-000000000004', 'iot'),
-('02300008-0000-4000-8000-000000000008', '02100004-0000-4000-8000-000000000004', 'device-management'),
-('02300009-0000-4000-8000-000000000009', '02100005-0000-4000-8000-000000000005', 'iot'),
-('0230000a-0000-4000-8000-000000000010', '02100005-0000-4000-8000-000000000005', 'streaming'),
-('0230000b-0000-4000-8000-000000000011', '02100005-0000-4000-8000-000000000005', 'real-time'),
-
--- Sales Analytics tags
-('0230000c-0000-4000-8000-000000000012', '02100007-0000-4000-8000-000000000007', 'analytics'),
-('0230000d-0000-4000-8000-000000000013', '02100007-0000-4000-8000-000000000007', 'bi-ready'),
-('0230000e-0000-4000-8000-000000000014', '02100007-0000-4000-8000-000000000007', 'retail')
-
-ON CONFLICT (id) DO NOTHING;
+-- NOTE: Dataset tags are now stored in entity_tag_associations (section 19)
+-- with entity_type='dataset'. The separate dataset_tags table has been removed.
 
 
 -- ============================================================================
@@ -1042,30 +1021,35 @@ ON CONFLICT (id) DO NOTHING;
 -- 15e. DATASET INSTANCES (type=025)
 -- ============================================================================
 -- Physical implementations of datasets across different systems/environments
+-- New fields: role (main/dimension/lookup/reference/staging), display_name, environment
 
-INSERT INTO dataset_instances (id, dataset_id, contract_id, contract_server_id, physical_path, status, notes, created_by, created_at, updated_at) VALUES
--- Customer Master - Production instances
-('02500001-0000-4000-8000-000000000001', '02100001-0000-4000-8000-000000000001', '00400001-0000-4000-8000-000000000001', 'srv00002-0000-4000-8000-000000000002', 'prod_catalog.crm.customers_master', 'active', 'Primary production instance in Unity Catalog', 'system@demo', NOW(), NOW()),
-('02500002-0000-4000-8000-000000000002', '02100001-0000-4000-8000-000000000001', '00400001-0000-4000-8000-000000000001', 'srv00003-0000-4000-8000-000000000003', 'ANALYTICS_DB.CRM.CUSTOMERS_MASTER', 'active', 'Snowflake replica for analytics workloads', 'system@demo', NOW(), NOW()),
+INSERT INTO dataset_instances (id, dataset_id, contract_id, contract_server_id, physical_path, role, display_name, environment, status, notes, created_by, created_at, updated_at) VALUES
+-- Customer Master - Production instances (multi-table dataset)
+('02500001-0000-4000-8000-000000000001', '02100001-0000-4000-8000-000000000001', '00400001-0000-4000-8000-000000000001', 'srv00002-0000-4000-8000-000000000002', 'prod_catalog.crm.customers_master', 'main', 'Customers Master Table', 'prod', 'active', 'Primary production instance in Unity Catalog', 'system@demo', NOW(), NOW()),
+('02500002-0000-4000-8000-000000000002', '02100001-0000-4000-8000-000000000001', '00400001-0000-4000-8000-000000000001', 'srv00003-0000-4000-8000-000000000003', 'ANALYTICS_DB.CRM.CUSTOMERS_MASTER', 'main', 'Snowflake Customers Replica', 'prod', 'active', 'Snowflake replica for analytics workloads', 'system@demo', NOW(), NOW()),
+('0250000a-0000-4000-8000-000000000010', '02100001-0000-4000-8000-000000000001', '00400001-0000-4000-8000-000000000001', NULL, 'prod_catalog.crm.customer_addresses', 'dimension', 'Customer Addresses', 'prod', 'active', 'Customer address dimension table', 'system@demo', NOW(), NOW()),
+('0250000b-0000-4000-8000-000000000011', '02100001-0000-4000-8000-000000000001', NULL, NULL, 'prod_catalog.reference.countries', 'lookup', 'Countries Lookup', 'prod', 'active', 'Country reference/lookup table', 'system@demo', NOW(), NOW()),
 
 -- Customer Master - Development instances
-('02500003-0000-4000-8000-000000000003', '02100002-0000-4000-8000-000000000002', '00400001-0000-4000-8000-000000000001', 'srv00001-0000-4000-8000-000000000001', 'dev_catalog.crm.customers_master', 'active', 'Development instance for testing new features', 'system@demo', NOW(), NOW()),
+('02500003-0000-4000-8000-000000000003', '02100002-0000-4000-8000-000000000002', '00400001-0000-4000-8000-000000000001', 'srv00001-0000-4000-8000-000000000001', 'dev_catalog.crm.customers_master', 'main', 'Dev Customers Table', 'dev', 'active', 'Development instance for testing new features', 'system@demo', NOW(), NOW()),
 
 -- Customer Preferences View instances
-('02500004-0000-4000-8000-000000000004', '02100003-0000-4000-8000-000000000003', '00400001-0000-4000-8000-000000000001', 'srv00002-0000-4000-8000-000000000002', 'prod_catalog.crm.v_customer_preferences', 'active', 'Production view aggregating customer preferences', 'system@demo', NOW(), NOW()),
+('02500004-0000-4000-8000-000000000004', '02100003-0000-4000-8000-000000000003', '00400001-0000-4000-8000-000000000001', 'srv00002-0000-4000-8000-000000000002', 'prod_catalog.crm.v_customer_preferences', 'main', 'Customer Preferences View', 'prod', 'active', 'Production view aggregating customer preferences', 'system@demo', NOW(), NOW()),
 
--- IoT Device Registry instances
-('02500005-0000-4000-8000-000000000005', '02100004-0000-4000-8000-000000000004', '00400004-0000-4000-8000-000000000004', 'srv00005-0000-4000-8000-000000000005', 'iot_catalog.devices.device_registry', 'active', 'Production IoT device registry', 'system@demo', NOW(), NOW()),
-('02500006-0000-4000-8000-000000000006', '02100004-0000-4000-8000-000000000004', '00400004-0000-4000-8000-000000000004', 'srv00004-0000-4000-8000-000000000004', 'iot_dev.devices.device_registry', 'active', 'Development IoT device registry for testing', 'system@demo', NOW(), NOW()),
+-- IoT Device Registry instances (multi-table dataset with staging)
+('02500005-0000-4000-8000-000000000005', '02100004-0000-4000-8000-000000000004', '00400004-0000-4000-8000-000000000004', 'srv00005-0000-4000-8000-000000000005', 'iot_catalog.devices.device_registry', 'main', 'Device Registry', 'prod', 'active', 'Production IoT device registry', 'system@demo', NOW(), NOW()),
+('02500006-0000-4000-8000-000000000006', '02100004-0000-4000-8000-000000000004', '00400004-0000-4000-8000-000000000004', 'srv00004-0000-4000-8000-000000000004', 'iot_dev.devices.device_registry', 'main', 'Dev Device Registry', 'dev', 'active', 'Development IoT device registry for testing', 'system@demo', NOW(), NOW()),
+('0250000c-0000-4000-8000-000000000012', '02100004-0000-4000-8000-000000000004', NULL, NULL, 'iot_catalog.devices.device_types', 'dimension', 'Device Types', 'prod', 'active', 'Device type dimension table', 'system@demo', NOW(), NOW()),
+('0250000d-0000-4000-8000-000000000013', '02100004-0000-4000-8000-000000000004', NULL, NULL, 'iot_staging.devices.device_raw', 'staging', 'Raw Device Data', 'prod', 'active', 'Staging table for incoming device data', 'system@demo', NOW(), NOW()),
 
 -- IoT Telemetry instances
-('02500007-0000-4000-8000-000000000007', '02100005-0000-4000-8000-000000000005', '00400004-0000-4000-8000-000000000004', 'srv00005-0000-4000-8000-000000000005', 'iot_catalog.telemetry.device_readings', 'active', 'Production telemetry data', 'system@demo', NOW(), NOW()),
+('02500007-0000-4000-8000-000000000007', '02100005-0000-4000-8000-000000000005', '00400004-0000-4000-8000-000000000004', 'srv00005-0000-4000-8000-000000000005', 'iot_catalog.telemetry.device_readings', 'main', 'Device Readings', 'prod', 'active', 'Production telemetry data', 'system@demo', NOW(), NOW()),
 
 -- Financial Transactions instances
-('02500008-0000-4000-8000-000000000008', '02100006-0000-4000-8000-000000000006', '00400006-0000-4000-8000-000000000006', 'srv00006-0000-4000-8000-000000000006', 'finance_dev.transactions.daily_transactions', 'active', 'Development instance for financial testing', 'system@demo', NOW(), NOW()),
+('02500008-0000-4000-8000-000000000008', '02100006-0000-4000-8000-000000000006', '00400006-0000-4000-8000-000000000006', 'srv00006-0000-4000-8000-000000000006', 'finance_dev.transactions.daily_transactions', 'main', 'Daily Transactions', 'dev', 'active', 'Development instance for financial testing', 'system@demo', NOW(), NOW()),
 
 -- Inventory Levels - deprecated dataset instance
-('02500009-0000-4000-8000-000000000009', '02100008-0000-4000-8000-000000000008', '00400007-0000-4000-8000-000000000007', NULL, 'analytics_catalog.supply_chain.inventory_current', 'deprecated', 'Legacy inventory table - migrating to new schema', 'system@demo', NOW(), NOW())
+('02500009-0000-4000-8000-000000000009', '02100008-0000-4000-8000-000000000008', '00400007-0000-4000-8000-000000000007', NULL, 'analytics_catalog.supply_chain.inventory_current', 'main', 'Current Inventory', 'prod', 'deprecated', 'Legacy inventory table - migrating to new schema', 'system@demo', NOW(), NOW())
 
 ON CONFLICT (id) DO NOTHING;
 
@@ -1244,7 +1228,29 @@ INSERT INTO entity_tag_associations (id, tag_id, entity_id, entity_type, assigne
 
 -- Inventory Levels (02100008) - deprecated, archived
 ('0290001f-0000-4000-8000-000000000031', '02700004-0000-4000-8000-000000000004', '02100008-0000-4000-8000-000000000008', 'dataset', NULL, 'system@demo', NOW()),
-('02900020-0000-4000-8000-000000000032', '0270000e-0000-4000-8000-000000000014', '02100008-0000-4000-8000-000000000008', 'dataset', NULL, 'system@demo', NOW())
+('02900020-0000-4000-8000-000000000032', '0270000e-0000-4000-8000-000000000014', '02100008-0000-4000-8000-000000000008', 'dataset', NULL, 'system@demo', NOW()),
+
+-- Dataset Instance tags (imported from Unity Catalog)
+-- Customer Master Production - Main Table (02500001) - delta, partitioned
+('02900021-0000-4000-8000-000000000033', '0270000d-0000-4000-8000-000000000013', '02500001-0000-4000-8000-000000000001', 'dataset_instance', NULL, 'system@demo', NOW()),
+('02900022-0000-4000-8000-000000000034', '02700010-0000-4000-8000-000000000016', '02500001-0000-4000-8000-000000000001', 'dataset_instance', NULL, 'system@demo', NOW()),
+
+-- Customer Addresses Dimension (0250000a) - delta
+('02900023-0000-4000-8000-000000000035', '0270000d-0000-4000-8000-000000000013', '0250000a-0000-4000-8000-000000000010', 'dataset_instance', NULL, 'system@demo', NOW()),
+
+-- IoT Device Registry - Main Table (02500005) - delta, partitioned
+('02900024-0000-4000-8000-000000000036', '0270000d-0000-4000-8000-000000000013', '02500005-0000-4000-8000-000000000005', 'dataset_instance', NULL, 'system@demo', NOW()),
+('02900025-0000-4000-8000-000000000037', '02700010-0000-4000-8000-000000000016', '02500005-0000-4000-8000-000000000005', 'dataset_instance', NULL, 'system@demo', NOW()),
+
+-- IoT Device Types Dimension (0250000c) - delta
+('02900026-0000-4000-8000-000000000038', '0270000d-0000-4000-8000-000000000013', '0250000c-0000-4000-8000-000000000012', 'dataset_instance', NULL, 'system@demo', NOW()),
+
+-- IoT Raw Device Staging (0250000d) - staging table
+('02900027-0000-4000-8000-000000000039', '02700008-0000-4000-8000-000000000008', '0250000d-0000-4000-8000-000000000013', 'dataset_instance', NULL, 'system@demo', NOW()),
+
+-- IoT Telemetry Main (02500007) - streaming, real-time
+('02900028-0000-4000-8000-000000000040', '0270000a-0000-4000-8000-000000000010', '02500007-0000-4000-8000-000000000007', 'dataset_instance', NULL, 'system@demo', NOW()),
+('02900029-0000-4000-8000-000000000041', '0270000c-0000-4000-8000-000000000012', '02500007-0000-4000-8000-000000000007', 'dataset_instance', NULL, 'system@demo', NOW())
 
 ON CONFLICT (tag_id, entity_id, entity_type) DO NOTHING;
 

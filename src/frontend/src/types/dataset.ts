@@ -1,9 +1,11 @@
 /**
  * Dataset Types
  *
- * Datasets represent physical implementations of Data Contracts.
- * A Dataset is a Unity Catalog table or view in a specific SDLC environment.
+ * Datasets are logical groupings of related data assets.
+ * Physical implementations are represented by DatasetInstance objects.
  */
+
+import type { AssignedTag } from '@/components/ui/tag-chip';
 
 // =============================================================================
 // Enums / Type Unions
@@ -11,18 +13,10 @@
 
 export type DatasetStatus = 'draft' | 'active' | 'deprecated' | 'retired';
 
-export type DatasetAssetType = 'table' | 'view';
+// Environment is used at the instance level only
+export type DatasetInstanceEnvironment = 'dev' | 'staging' | 'prod' | 'test' | 'qa' | 'uat';
 
-export type DatasetEnvironment = 'dev' | 'staging' | 'prod' | 'test' | 'qa' | 'uat';
-
-// =============================================================================
-// Tag Types
-// =============================================================================
-
-export interface DatasetTag {
-  id?: string;
-  name: string;
-}
+export type DatasetInstanceRole = 'main' | 'dimension' | 'lookup' | 'reference' | 'staging';
 
 // =============================================================================
 // Custom Property Types
@@ -91,9 +85,17 @@ export interface DatasetInstance {
   // Physical location
   physical_path: string;
 
+  // Role and identity within the dataset
+  role: DatasetInstanceRole;
+  display_name?: string;
+  environment?: DatasetInstanceEnvironment;
+
   // Instance status
   status: DatasetInstanceStatus;
   notes?: string;
+
+  // Tags (from unified tagging system)
+  tags?: AssignedTag[];
 
   // Audit
   created_at?: string;
@@ -106,16 +108,24 @@ export interface DatasetInstanceCreate {
   contract_id?: string;
   contract_server_id?: string;
   physical_path: string;
+  role?: DatasetInstanceRole;
+  display_name?: string;
+  environment?: DatasetInstanceEnvironment;
   status?: DatasetInstanceStatus;
   notes?: string;
+  tags?: { tag_fqn?: string; tag_id?: string; assigned_value?: string }[];
 }
 
 export interface DatasetInstanceUpdate {
   contract_id?: string;
   contract_server_id?: string;
   physical_path?: string;
+  role?: DatasetInstanceRole;
+  display_name?: string;
+  environment?: DatasetInstanceEnvironment;
   status?: DatasetInstanceStatus;
   notes?: string;
+  tags?: { tag_fqn?: string; tag_id?: string; assigned_value?: string }[];
 }
 
 export interface DatasetInstanceListResponse {
@@ -136,6 +146,48 @@ export const DATASET_INSTANCE_STATUS_COLORS: Record<DatasetInstanceStatus, strin
   retired: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
 };
 
+export const DATASET_INSTANCE_ROLE_LABELS: Record<DatasetInstanceRole, string> = {
+  main: 'Main Table',
+  dimension: 'Dimension',
+  lookup: 'Lookup',
+  reference: 'Reference',
+  staging: 'Staging',
+};
+
+export const DATASET_INSTANCE_ROLE_COLORS: Record<DatasetInstanceRole, string> = {
+  main: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+  dimension: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
+  lookup: 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300',
+  reference: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
+  staging: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
+};
+
+export const DATASET_INSTANCE_ROLE_ICONS: Record<DatasetInstanceRole, string> = {
+  main: '⬤',
+  dimension: '◆',
+  lookup: '◇',
+  reference: '○',
+  staging: '▲',
+};
+
+export const DATASET_INSTANCE_ENVIRONMENT_LABELS: Record<DatasetInstanceEnvironment, string> = {
+  dev: 'Development',
+  staging: 'Staging',
+  prod: 'Production',
+  test: 'Test',
+  qa: 'QA',
+  uat: 'UAT',
+};
+
+export const DATASET_INSTANCE_ENVIRONMENT_COLORS: Record<DatasetInstanceEnvironment, string> = {
+  dev: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+  staging: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
+  prod: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+  test: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
+  qa: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
+  uat: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300',
+};
+
 // =============================================================================
 // Dataset List Item (Lightweight for list views)
 // =============================================================================
@@ -143,22 +195,30 @@ export const DATASET_INSTANCE_STATUS_COLORS: Record<DatasetInstanceStatus, strin
 export interface DatasetListItem {
   id: string;
   name: string;
-  asset_type: DatasetAssetType;
-  catalog_name: string;
-  schema_name: string;
-  object_name: string;
-  full_path?: string;
-  environment: DatasetEnvironment;
+  description?: string;
+  
+  // Lifecycle
   status: DatasetStatus;
+  version?: string;
   published: boolean;
+  
+  // Contract reference
   contract_id?: string;
   contract_name?: string;
+  
+  // Ownership
   owner_team_id?: string;
   owner_team_name?: string;
-  created_at?: string;
-  updated_at?: string;
+  project_id?: string;
+  project_name?: string;
+  
+  // Counts
   subscriber_count?: number;
   instance_count?: number;
+  
+  // Audit
+  created_at?: string;
+  updated_at?: string;
 }
 
 // =============================================================================
@@ -170,16 +230,7 @@ export interface Dataset {
   name: string;
   description?: string;
 
-  // Physical asset reference
-  asset_type: DatasetAssetType;
-  catalog_name: string;
-  schema_name: string;
-  object_name: string;
-
-  // SDLC environment
-  environment: DatasetEnvironment;
-
-  // Contract reference
+  // Contract reference (optional default contract)
   contract_id?: string;
   contract_name?: string;
 
@@ -193,9 +244,12 @@ export interface Dataset {
   status: DatasetStatus;
   version?: string;
   published: boolean;
+  
+  // Metadata inheritance
+  max_level_inheritance?: number;
 
   // Related data
-  tags?: DatasetTag[];
+  tags?: AssignedTag[];
   custom_properties?: DatasetCustomProperty[];
   instances?: DatasetInstance[];
   subscriber_count?: number;
@@ -216,16 +270,7 @@ export interface DatasetCreate {
   name: string;
   description?: string;
 
-  // Physical asset reference
-  asset_type: DatasetAssetType;
-  catalog_name: string;
-  schema_name: string;
-  object_name: string;
-
-  // SDLC environment
-  environment: DatasetEnvironment;
-
-  // Contract reference
+  // Contract reference (optional)
   contract_id?: string;
 
   // Ownership and project
@@ -236,9 +281,12 @@ export interface DatasetCreate {
   status?: DatasetStatus;
   version?: string;
   published?: boolean;
+  
+  // Metadata inheritance
+  max_level_inheritance?: number;
 
-  // Optional related data
-  tags?: { name: string }[];
+  // Optional related data (uses unified tagging system)
+  tags?: { tag_fqn?: string; tag_id?: string; assigned_value?: string }[];
   custom_properties?: { property: string; value?: string }[];
 }
 
@@ -246,15 +294,6 @@ export interface DatasetUpdate {
   name?: string;
   description?: string;
 
-  // Physical asset reference
-  asset_type?: DatasetAssetType;
-  catalog_name?: string;
-  schema_name?: string;
-  object_name?: string;
-
-  // SDLC environment
-  environment?: DatasetEnvironment;
-
   // Contract reference
   contract_id?: string;
 
@@ -266,9 +305,12 @@ export interface DatasetUpdate {
   status?: DatasetStatus;
   version?: string;
   published?: boolean;
+  
+  // Metadata inheritance
+  max_level_inheritance?: number;
 
-  // Optional related data
-  tags?: { name: string }[];
+  // Optional related data (uses unified tagging system)
+  tags?: { tag_fqn?: string; tag_id?: string; assigned_value?: string }[];
   custom_properties?: { property: string; value?: string }[];
 }
 
@@ -277,33 +319,16 @@ export interface DatasetUpdate {
 // =============================================================================
 
 export interface DatasetFilter {
-  environment?: DatasetEnvironment;
   status?: DatasetStatus;
-  asset_type?: DatasetAssetType;
   contract_id?: string;
   owner_team_id?: string;
   project_id?: string;
   published?: boolean;
-  catalog_name?: string;
   search?: string;
 }
 
 // =============================================================================
-// Asset Validation Types
-// =============================================================================
-
-export interface AssetValidationResult {
-  exists: boolean;
-  validated: boolean;
-  message?: string;
-  asset_type?: string;
-  name?: string;
-  catalog?: string;
-  schema?: string;
-}
-
-// =============================================================================
-// Status / Environment Display Helpers
+// Status Display Helpers
 // =============================================================================
 
 export const DATASET_STATUS_LABELS: Record<DatasetStatus, string> = {
@@ -319,27 +344,3 @@ export const DATASET_STATUS_COLORS: Record<DatasetStatus, string> = {
   deprecated: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
   retired: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
 };
-
-export const DATASET_ENVIRONMENT_LABELS: Record<DatasetEnvironment, string> = {
-  dev: 'Development',
-  staging: 'Staging',
-  prod: 'Production',
-  test: 'Test',
-  qa: 'QA',
-  uat: 'UAT',
-};
-
-export const DATASET_ENVIRONMENT_COLORS: Record<DatasetEnvironment, string> = {
-  dev: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-  staging: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
-  prod: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-  test: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
-  qa: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
-  uat: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300',
-};
-
-export const DATASET_ASSET_TYPE_LABELS: Record<DatasetAssetType, string> = {
-  table: 'Table',
-  view: 'View',
-};
-

@@ -13,7 +13,6 @@ from src.common.repository import CRUDBase
 from src.db_models.datasets import (
     DatasetDb,
     DatasetSubscriptionDb,
-    DatasetTagDb,
     DatasetCustomPropertyDb,
     DatasetInstanceDb,
 )
@@ -38,7 +37,7 @@ class DatasetRepository(CRUDBase[DatasetDb, Dict[str, Any], Union[Dict[str, Any]
                     selectinload(self.model.owner_team),
                     selectinload(self.model.project),
                     selectinload(self.model.subscriptions),
-                    selectinload(self.model.tags),
+                    # Tags now loaded via TagsManager (entity_type="dataset")
                     selectinload(self.model.custom_properties),
                     selectinload(self.model.instances).selectinload(DatasetInstanceDb.contract),
                     selectinload(self.model.instances).selectinload(DatasetInstanceDb.contract_server),
@@ -57,30 +56,6 @@ class DatasetRepository(CRUDBase[DatasetDb, Dict[str, Any], Union[Dict[str, Any]
             return db.query(self.model).filter(self.model.name == name).first()
         except Exception as e:
             logger.error(f"Error fetching Dataset by name {name}: {e}", exc_info=True)
-            db.rollback()
-            raise
-
-    def get_by_asset_path(
-        self,
-        db: Session,
-        *,
-        catalog_name: str,
-        schema_name: str,
-        object_name: str,
-        environment: Optional[str] = None
-    ) -> Optional[DatasetDb]:
-        """Get dataset by Unity Catalog path and optional environment."""
-        try:
-            query = db.query(self.model).filter(
-                self.model.catalog_name == catalog_name,
-                self.model.schema_name == schema_name,
-                self.model.object_name == object_name,
-            )
-            if environment:
-                query = query.filter(self.model.environment == environment)
-            return query.first()
-        except Exception as e:
-            logger.error(f"Error fetching Dataset by path {catalog_name}.{schema_name}.{object_name}: {e}", exc_info=True)
             db.rollback()
             raise
 
@@ -110,63 +85,35 @@ class DatasetRepository(CRUDBase[DatasetDb, Dict[str, Any], Union[Dict[str, Any]
             db.rollback()
             raise
 
-    def get_by_environment(
-        self,
-        db: Session,
-        *,
-        environment: str,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[DatasetDb]:
-        """Get all datasets in a specific environment."""
-        try:
-            return (
-                db.query(self.model)
-                .filter(self.model.environment == environment)
-                .offset(skip)
-                .limit(limit)
-                .all()
-            )
-        except Exception as e:
-            logger.error(f"Error fetching Datasets by environment {environment}: {e}", exc_info=True)
-            db.rollback()
-            raise
-
     def get_multi(
         self,
         db: Session,
         *,
         skip: int = 0,
         limit: int = 100,
-        environment: Optional[str] = None,
         status: Optional[str] = None,
-        asset_type: Optional[str] = None,
         contract_id: Optional[str] = None,
         owner_team_id: Optional[str] = None,
         project_id: Optional[str] = None,
         published: Optional[bool] = None,
-        catalog_name: Optional[str] = None,
         search: Optional[str] = None,
         is_admin: bool = False
     ) -> List[DatasetDb]:
         """Get multiple datasets with optional filtering."""
-        logger.debug(f"Fetching Datasets with filters: env={environment}, status={status}, search={search}")
+        logger.debug(f"Fetching Datasets with filters: status={status}, search={search}")
         try:
             query = db.query(self.model).options(
                 selectinload(self.model.contract),
                 selectinload(self.model.owner_team),
+                selectinload(self.model.project),
                 selectinload(self.model.subscriptions),
-                selectinload(self.model.tags),
+                # Tags now loaded via TagsManager (entity_type="dataset")
                 selectinload(self.model.instances),
             )
 
             # Apply filters
-            if environment:
-                query = query.filter(self.model.environment == environment)
             if status:
                 query = query.filter(self.model.status == status)
-            if asset_type:
-                query = query.filter(self.model.asset_type == asset_type)
             if contract_id:
                 query = query.filter(self.model.contract_id == contract_id)
             if owner_team_id:
@@ -181,15 +128,12 @@ class DatasetRepository(CRUDBase[DatasetDb, Dict[str, Any], Union[Dict[str, Any]
                 )
             if published is not None:
                 query = query.filter(self.model.published == published)
-            if catalog_name:
-                query = query.filter(self.model.catalog_name == catalog_name)
             if search:
                 search_pattern = f"%{search}%"
                 query = query.filter(
                     or_(
                         self.model.name.ilike(search_pattern),
                         self.model.description.ilike(search_pattern),
-                        self.model.object_name.ilike(search_pattern),
                     )
                 )
 
@@ -388,58 +332,6 @@ class DatasetSubscriptionRepository(CRUDBase[DatasetSubscriptionDb, Dict[str, An
 
 # Singleton instance
 dataset_subscription_repo = DatasetSubscriptionRepository()
-
-
-class DatasetTagRepository(CRUDBase[DatasetTagDb, Dict[str, Any], DatasetTagDb]):
-    """Repository for Dataset Tag operations."""
-
-    def __init__(self):
-        super().__init__(DatasetTagDb)
-
-    def get_by_dataset(self, db: Session, *, dataset_id: str) -> List[DatasetTagDb]:
-        """Get all tags for a dataset."""
-        try:
-            return db.query(self.model).filter(self.model.dataset_id == dataset_id).all()
-        except Exception as e:
-            logger.error(f"Error fetching tags for dataset {dataset_id}: {e}", exc_info=True)
-            db.rollback()
-            raise
-
-    def create_tag(self, db: Session, *, dataset_id: str, name: str) -> DatasetTagDb:
-        """Create a tag for a dataset."""
-        try:
-            # Check for duplicate
-            existing = db.query(self.model).filter(
-                self.model.dataset_id == dataset_id,
-                self.model.name == name
-            ).first()
-            if existing:
-                return existing
-            
-            tag = DatasetTagDb(dataset_id=dataset_id, name=name)
-            db.add(tag)
-            db.flush()
-            db.refresh(tag)
-            return tag
-        except Exception as e:
-            logger.error(f"Error creating tag for dataset {dataset_id}: {e}", exc_info=True)
-            db.rollback()
-            raise
-
-    def delete_by_dataset(self, db: Session, *, dataset_id: str) -> int:
-        """Delete all tags for a dataset."""
-        try:
-            count = db.query(self.model).filter(self.model.dataset_id == dataset_id).delete()
-            db.flush()
-            return count
-        except Exception as e:
-            logger.error(f"Error deleting tags for dataset {dataset_id}: {e}", exc_info=True)
-            db.rollback()
-            raise
-
-
-# Singleton instance
-dataset_tag_repo = DatasetTagRepository()
 
 
 class DatasetCustomPropertyRepository(CRUDBase[DatasetCustomPropertyDb, Dict[str, Any], DatasetCustomPropertyDb]):
@@ -657,6 +549,9 @@ class DatasetInstanceRepository(CRUDBase[DatasetInstanceDb, Dict[str, Any], Data
         contract_id: Optional[str] = None,
         contract_server_id: Optional[str] = None,
         physical_path: str,
+        role: str = "main",
+        display_name: Optional[str] = None,
+        environment: Optional[str] = None,
         status: str = "active",
         notes: Optional[str] = None,
         created_by: Optional[str] = None
@@ -668,6 +563,9 @@ class DatasetInstanceRepository(CRUDBase[DatasetInstanceDb, Dict[str, Any], Data
                 contract_id=contract_id,
                 contract_server_id=contract_server_id,
                 physical_path=physical_path,
+                role=role,
+                display_name=display_name,
+                environment=environment,
                 status=status,
                 notes=notes,
                 created_by=created_by,
@@ -689,6 +587,9 @@ class DatasetInstanceRepository(CRUDBase[DatasetInstanceDb, Dict[str, Any], Data
         contract_id: Optional[str] = None,
         contract_server_id: Optional[str] = None,
         physical_path: Optional[str] = None,
+        role: Optional[str] = None,
+        display_name: Optional[str] = None,
+        environment: Optional[str] = None,
         status: Optional[str] = None,
         notes: Optional[str] = None,
         updated_by: Optional[str] = None
@@ -701,6 +602,12 @@ class DatasetInstanceRepository(CRUDBase[DatasetInstanceDb, Dict[str, Any], Data
                 instance.contract_server_id = contract_server_id
             if physical_path is not None:
                 instance.physical_path = physical_path
+            if role is not None:
+                instance.role = role
+            if display_name is not None:
+                instance.display_name = display_name
+            if environment is not None:
+                instance.environment = environment
             if status is not None:
                 instance.status = status
             if notes is not None:

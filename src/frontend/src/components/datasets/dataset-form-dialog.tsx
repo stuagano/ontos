@@ -22,13 +22,11 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useProjectContext } from '@/stores/project-store';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Info } from 'lucide-react';
 import type {
   Dataset,
   DatasetCreate,
   DatasetUpdate,
-  DatasetAssetType,
-  DatasetEnvironment,
   DatasetStatus,
 } from '@/types/dataset';
 
@@ -42,11 +40,6 @@ interface DatasetFormDialogProps {
 interface FormData {
   name: string;
   description: string;
-  asset_type: DatasetAssetType;
-  catalog_name: string;
-  schema_name: string;
-  object_name: string;
-  environment: DatasetEnvironment;
   contract_id: string;
   owner_team_id: string;
   project_id: string;
@@ -81,11 +74,6 @@ export default function DatasetFormDialog({
     defaultValues: {
       name: '',
       description: '',
-      asset_type: 'table',
-      catalog_name: '',
-      schema_name: '',
-      object_name: '',
-      environment: 'dev',
       contract_id: '',
       owner_team_id: '',
       project_id: '',
@@ -125,11 +113,6 @@ export default function DatasetFormDialog({
         reset({
           name: dataset.name,
           description: dataset.description || '',
-          asset_type: dataset.asset_type as DatasetAssetType,
-          catalog_name: dataset.catalog_name,
-          schema_name: dataset.schema_name,
-          object_name: dataset.object_name,
-          environment: dataset.environment as DatasetEnvironment,
           contract_id: dataset.contract_id || '',
           owner_team_id: dataset.owner_team_id || '',
           project_id: dataset.project_id || '',
@@ -142,11 +125,6 @@ export default function DatasetFormDialog({
         reset({
           name: '',
           description: '',
-          asset_type: 'table',
-          catalog_name: '',
-          schema_name: '',
-          object_name: '',
-          environment: 'dev',
           contract_id: '',
           owner_team_id: '',
           project_id: currentProject?.id || '',
@@ -165,11 +143,6 @@ export default function DatasetFormDialog({
       const payload: DatasetCreate | DatasetUpdate = {
         name: data.name,
         description: data.description || undefined,
-        asset_type: data.asset_type,
-        catalog_name: data.catalog_name,
-        schema_name: data.schema_name,
-        object_name: data.object_name,
-        environment: data.environment,
         contract_id: data.contract_id || undefined,
         owner_team_id: data.owner_team_id || undefined,
         project_id: data.project_id || undefined,
@@ -211,7 +184,7 @@ export default function DatasetFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {isEditMode ? 'Edit Dataset' : 'Create New Dataset'}
@@ -219,21 +192,23 @@ export default function DatasetFormDialog({
           <DialogDescription>
             {isEditMode
               ? 'Update the dataset configuration'
-              : 'Create a new dataset to represent a physical implementation of a data contract'}
+              : 'Create a logical grouping for related data assets'}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* Basic Information */}
           <div className="space-y-4">
-            <h3 className="font-medium">Basic Information</h3>
+            <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+              Basic Information
+            </h3>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Name *</Label>
                 <Input
                   id="name"
-                  placeholder="e.g., Sales Data - Production"
+                  placeholder="e.g., Customer Master Data"
                   {...register('name', { required: 'Name is required' })}
                 />
                 {errors.name && (
@@ -264,96 +239,18 @@ export default function DatasetFormDialog({
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
-                placeholder="Describe this dataset..."
+                placeholder="Describe this dataset and its purpose..."
+                rows={3}
                 {...register('description')}
               />
             </div>
           </div>
 
-          {/* Asset Information */}
-          <div className="space-y-4">
-            <h3 className="font-medium">Unity Catalog Asset</h3>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="asset_type">Asset Type *</Label>
-                <Select
-                  value={watch('asset_type')}
-                  onValueChange={(v) => setValue('asset_type', v as DatasetAssetType)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="table">Table</SelectItem>
-                    <SelectItem value="view">View</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="environment">Environment *</Label>
-                <Select
-                  value={watch('environment')}
-                  onValueChange={(v) => setValue('environment', v as DatasetEnvironment)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select environment" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="dev">Development</SelectItem>
-                    <SelectItem value="staging">Staging</SelectItem>
-                    <SelectItem value="prod">Production</SelectItem>
-                    <SelectItem value="test">Test</SelectItem>
-                    <SelectItem value="qa">QA</SelectItem>
-                    <SelectItem value="uat">UAT</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="catalog_name">Catalog *</Label>
-                <Input
-                  id="catalog_name"
-                  placeholder="my_catalog"
-                  {...register('catalog_name', { required: 'Catalog is required' })}
-                />
-                {errors.catalog_name && (
-                  <p className="text-sm text-destructive">{errors.catalog_name.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="schema_name">Schema *</Label>
-                <Input
-                  id="schema_name"
-                  placeholder="my_schema"
-                  {...register('schema_name', { required: 'Schema is required' })}
-                />
-                {errors.schema_name && (
-                  <p className="text-sm text-destructive">{errors.schema_name.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="object_name">Object Name *</Label>
-                <Input
-                  id="object_name"
-                  placeholder="my_table"
-                  {...register('object_name', { required: 'Object name is required' })}
-                />
-                {errors.object_name && (
-                  <p className="text-sm text-destructive">{errors.object_name.message}</p>
-                )}
-              </div>
-            </div>
-          </div>
-
           {/* Contract & Ownership */}
           <div className="space-y-4">
-            <h3 className="font-medium">Contract & Ownership</h3>
+            <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+              Contract & Ownership
+            </h3>
 
             <div className="space-y-2">
               <Label htmlFor="contract_id">Data Contract</Label>
@@ -374,7 +271,7 @@ export default function DatasetFormDialog({
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Link this dataset to a data contract to define schema and quality requirements
+                Optional: Link to a data contract for governance
               </p>
             </div>
 
@@ -423,7 +320,9 @@ export default function DatasetFormDialog({
 
           {/* Version & Publication */}
           <div className="space-y-4">
-            <h3 className="font-medium">Version & Publication</h3>
+            <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+              Version & Publication
+            </h3>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -446,6 +345,21 @@ export default function DatasetFormDialog({
             </div>
           </div>
 
+          {/* Info about instances */}
+          {!isEditMode && (
+            <div className="rounded-lg bg-muted/50 p-4 flex gap-3">
+              <Info className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+              <div className="text-sm text-muted-foreground">
+                <p className="font-medium text-foreground mb-1">What&apos;s next?</p>
+                <p>
+                  After creating this dataset, you can add physical instances (tables, views)
+                  from the dataset details page. Each instance can be linked to different
+                  environments and contract versions.
+                </p>
+              </div>
+            </div>
+          )}
+
           <DialogFooter>
             <Button
               type="button"
@@ -465,4 +379,3 @@ export default function DatasetFormDialog({
     </Dialog>
   );
 }
-

@@ -22,9 +22,10 @@ import {
   Trash2,
   AlertCircle,
   Search,
-  Table2,
+  Database,
   FileText,
   Users,
+  Server,
 } from 'lucide-react';
 import {
   Tooltip,
@@ -35,15 +36,10 @@ import {
 import type {
   DatasetListItem,
   DatasetStatus,
-  DatasetEnvironment,
-  DatasetAssetType,
 } from '@/types/dataset';
 import {
   DATASET_STATUS_LABELS,
   DATASET_STATUS_COLORS,
-  DATASET_ENVIRONMENT_LABELS,
-  DATASET_ENVIRONMENT_COLORS,
-  DATASET_ASSET_TYPE_LABELS,
 } from '@/types/dataset';
 import DatasetFormDialog from '@/components/datasets/dataset-form-dialog';
 
@@ -64,9 +60,7 @@ export default function Datasets() {
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState('');
-  const [environmentFilter, setEnvironmentFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [assetTypeFilter, setAssetTypeFilter] = useState<string>('all');
 
   // Fetch datasets
   const fetchDatasets = useCallback(async () => {
@@ -80,14 +74,8 @@ export default function Datasets() {
       if (searchQuery) {
         params.append('search', searchQuery);
       }
-      if (environmentFilter && environmentFilter !== 'all') {
-        params.append('environment', environmentFilter);
-      }
       if (statusFilter && statusFilter !== 'all') {
         params.append('status', statusFilter);
-      }
-      if (assetTypeFilter && assetTypeFilter !== 'all') {
-        params.append('asset_type', assetTypeFilter);
       }
 
       const queryString = params.toString();
@@ -103,7 +91,7 @@ export default function Datasets() {
     } finally {
       setLoading(false);
     }
-  }, [hasProjectContext, currentProject, searchQuery, environmentFilter, statusFilter, assetTypeFilter]);
+  }, [hasProjectContext, currentProject, searchQuery, statusFilter]);
 
   useEffect(() => {
     fetchDatasets();
@@ -157,38 +145,13 @@ export default function Datasets() {
           >
             {row.original.name}
           </span>
-          <span className="text-xs text-muted-foreground font-mono">
-            {row.original.full_path || `${row.original.catalog_name}.${row.original.schema_name}.${row.original.object_name}`}
-          </span>
+          {row.original.description && (
+            <span className="text-xs text-muted-foreground line-clamp-1">
+              {row.original.description}
+            </span>
+          )}
         </div>
       ),
-    },
-    {
-      accessorKey: 'asset_type',
-      header: 'Type',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-1">
-          <Table2 className="h-3 w-3 text-muted-foreground" />
-          <span className="text-sm">
-            {DATASET_ASSET_TYPE_LABELS[row.original.asset_type as DatasetAssetType] || row.original.asset_type}
-          </span>
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'environment',
-      header: 'Environment',
-      cell: ({ row }) => {
-        const env = row.original.environment as DatasetEnvironment;
-        return (
-          <Badge
-            variant="outline"
-            className={DATASET_ENVIRONMENT_COLORS[env] || 'bg-gray-100'}
-          >
-            {DATASET_ENVIRONMENT_LABELS[env] || env}
-          </Badge>
-        );
-      },
     },
     {
       accessorKey: 'status',
@@ -206,11 +169,23 @@ export default function Datasets() {
       },
     },
     {
+      accessorKey: 'instance_count',
+      header: 'Instances',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <Server className="h-3 w-3 text-muted-foreground" />
+          <span className="text-sm">
+            {row.original.instance_count || 0}
+          </span>
+        </div>
+      ),
+    },
+    {
       accessorKey: 'contract_name',
       header: 'Contract',
       cell: ({ row }) => {
         if (!row.original.contract_id) {
-          return <span className="text-muted-foreground text-sm">Not assigned</span>;
+          return <span className="text-muted-foreground text-sm">-</span>;
         }
         return (
           <TooltipProvider>
@@ -262,6 +237,15 @@ export default function Datasets() {
       ),
     },
     {
+      accessorKey: 'version',
+      header: 'Version',
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground font-mono">
+          {row.original.version || '-'}
+        </span>
+      ),
+    },
+    {
       accessorKey: 'updated_at',
       header: 'Updated',
       cell: ({ row }) => (
@@ -304,11 +288,11 @@ export default function Datasets() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Table2 className="w-8 h-8" />
+            <Database className="w-8 h-8" />
             Datasets
           </h1>
           <p className="text-muted-foreground">
-            Physical implementations of data contracts (tables and views)
+            Logical groupings of related data assets
           </p>
         </div>
         <Button onClick={() => setOpenCreateDialog(true)}>
@@ -329,21 +313,6 @@ export default function Datasets() {
           />
         </div>
 
-        <Select value={environmentFilter} onValueChange={setEnvironmentFilter}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Environment" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Environments</SelectItem>
-            <SelectItem value="dev">Development</SelectItem>
-            <SelectItem value="staging">Staging</SelectItem>
-            <SelectItem value="prod">Production</SelectItem>
-            <SelectItem value="test">Test</SelectItem>
-            <SelectItem value="qa">QA</SelectItem>
-            <SelectItem value="uat">UAT</SelectItem>
-          </SelectContent>
-        </Select>
-
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[130px]">
             <SelectValue placeholder="Status" />
@@ -354,17 +323,6 @@ export default function Datasets() {
             <SelectItem value="active">Active</SelectItem>
             <SelectItem value="deprecated">Deprecated</SelectItem>
             <SelectItem value="retired">Retired</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={assetTypeFilter} onValueChange={setAssetTypeFilter}>
-          <SelectTrigger className="w-[120px]">
-            <SelectValue placeholder="Type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="table">Table</SelectItem>
-            <SelectItem value="view">View</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -397,4 +355,3 @@ export default function Datasets() {
     </div>
   );
 }
-

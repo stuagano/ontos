@@ -1,20 +1,15 @@
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { HardDrive, FileText, Users, Bell } from 'lucide-react';
+import { Database, FileText, Users, Bell, Server } from 'lucide-react';
 import { RelativeDate } from '@/components/common/relative-date';
 import type {
   DatasetListItem,
   DatasetStatus,
-  DatasetEnvironment,
-  DatasetAssetType,
 } from '@/types/dataset';
 import {
   DATASET_STATUS_LABELS,
   DATASET_STATUS_COLORS,
-  DATASET_ENVIRONMENT_LABELS,
-  DATASET_ENVIRONMENT_COLORS,
-  DATASET_ASSET_TYPE_LABELS,
 } from '@/types/dataset';
 
 interface DatasetCardProps {
@@ -23,8 +18,6 @@ interface DatasetCardProps {
 
 export default function DatasetCard({ dataset }: DatasetCardProps) {
   const status = dataset.status as DatasetStatus;
-  const environment = dataset.environment as DatasetEnvironment;
-  const assetType = dataset.asset_type as DatasetAssetType;
 
   return (
     <Link to={`/datasets/${dataset.id}`}>
@@ -32,36 +25,38 @@ export default function DatasetCard({ dataset }: DatasetCardProps) {
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2">
-              <HardDrive className="h-5 w-5 text-muted-foreground" />
+              <Database className="h-5 w-5 text-muted-foreground" />
               <CardTitle className="text-lg">{dataset.name}</CardTitle>
             </div>
             <div className="flex gap-1">
               <Badge
                 variant="outline"
-                className={DATASET_ENVIRONMENT_COLORS[environment] || 'bg-gray-100'}
+                className={DATASET_STATUS_COLORS[status] || 'bg-gray-100'}
               >
-                {DATASET_ENVIRONMENT_LABELS[environment] || environment}
+                {DATASET_STATUS_LABELS[status] || status}
               </Badge>
             </div>
           </div>
-          <CardDescription className="font-mono text-xs">
-            {dataset.full_path || `${dataset.catalog_name}.${dataset.schema_name}.${dataset.object_name}`}
-          </CardDescription>
+          {dataset.description && (
+            <CardDescription className="text-sm line-clamp-2">
+              {dataset.description}
+            </CardDescription>
+          )}
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* Type and Status */}
+          {/* Instances and Published */}
           <div className="flex items-center gap-2">
-            <Badge variant="secondary">
-              {DATASET_ASSET_TYPE_LABELS[assetType] || assetType}
-            </Badge>
-            <Badge
-              variant="outline"
-              className={DATASET_STATUS_COLORS[status] || 'bg-gray-100'}
-            >
-              {DATASET_STATUS_LABELS[status] || status}
-            </Badge>
+            {dataset.instance_count !== undefined && dataset.instance_count > 0 && (
+              <Badge variant="secondary" className="flex items-center gap-1">
+                <Server className="h-3 w-3" />
+                {dataset.instance_count} instance{dataset.instance_count !== 1 ? 's' : ''}
+              </Badge>
+            )}
             {dataset.published && (
               <Badge variant="secondary">Published</Badge>
+            )}
+            {dataset.version && (
+              <Badge variant="outline" className="font-mono">v{dataset.version}</Badge>
             )}
           </div>
 
@@ -98,4 +93,3 @@ export default function DatasetCard({ dataset }: DatasetCardProps) {
     </Link>
   );
 }
-

@@ -8,7 +8,7 @@ import { Loader2, Database, Search, Bell, Bookmark, X, LayoutList, Network, Pack
 import { useDomains } from '@/hooks/use-domains';
 import { type DataProduct } from '@/types/data-product';
 import { type DataDomain } from '@/types/data-domain';
-import { type DatasetListItem, DATASET_ENVIRONMENT_LABELS, DATASET_ENVIRONMENT_COLORS } from '@/types/dataset';
+import { type DatasetListItem, DATASET_STATUS_LABELS, DATASET_STATUS_COLORS } from '@/types/dataset';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -513,8 +513,8 @@ export default function MarketplaceView({ className }: MarketplaceViewProps) {
 
   // Render dataset card
   const renderDatasetCard = (dataset: DatasetListItem, isSubscribed: boolean = false) => {
-    const envLabel = DATASET_ENVIRONMENT_LABELS[dataset.environment] || dataset.environment;
-    const envColorClass = DATASET_ENVIRONMENT_COLORS[dataset.environment] || '';
+    const statusLabel = DATASET_STATUS_LABELS[dataset.status] || dataset.status;
+    const statusColorClass = DATASET_STATUS_COLORS[dataset.status] || '';
 
     return (
       <Card 
@@ -535,18 +535,22 @@ export default function MarketplaceView({ className }: MarketplaceViewProps) {
               <Bell className="h-4 w-4 text-primary flex-shrink-0" />
             )}
           </div>
-          <CardDescription className="line-clamp-2 text-sm font-mono text-xs">
-            {dataset.full_path || `${dataset.catalog_name}.${dataset.schema_name}.${dataset.object_name}`}
-          </CardDescription>
+          {dataset.description && (
+            <CardDescription className="line-clamp-2 text-sm">
+              {dataset.description}
+            </CardDescription>
+          )}
         </CardHeader>
         <CardContent className="pt-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge className={cn("text-xs", envColorClass)}>
-              {envLabel}
+            <Badge className={cn("text-xs", statusColorClass)}>
+              {statusLabel}
             </Badge>
-            <Badge variant="outline" className="text-xs">
-              {dataset.asset_type}
-            </Badge>
+            {dataset.instance_count !== undefined && dataset.instance_count > 0 && (
+              <Badge variant="outline" className="text-xs">
+                {dataset.instance_count} instance{dataset.instance_count !== 1 ? 's' : ''}
+              </Badge>
+            )}
             {dataset.contract_name && (
               <Badge variant="secondary" className="text-xs">
                 {dataset.contract_name}
