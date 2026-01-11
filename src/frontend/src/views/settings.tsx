@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,15 +52,11 @@ export default function Settings() {
   const { isLoading: permissionsLoading, hasPermission } = usePermissions();
   const { toast } = useToast();
   const { tab: urlTab } = useParams<{ tab?: string }>();
-  const [searchParams] = useSearchParams();
   
   // Determine the active tab from URL param or default to 'general'
   const validTabs = ['general', 'databricks', 'git', 'jobs', 'roles', 'tags', 'semantic-models', 'search', 'mcp-tokens'];
   const activeTab = urlTab && validTabs.includes(urlTab) ? urlTab : 'general';
-  
-  // Get tagId from query params for tags tab
-  const tagIdFromQuery = searchParams.get('tagId');
-  
+
   // Check if user has at least READ_ONLY access to settings
   const hasSettingsAccess = hasPermission('settings', FeatureAccessLevel.READ_ONLY);
   const hasWriteAccess = hasPermission('settings', FeatureAccessLevel.READ_WRITE);
@@ -539,7 +535,7 @@ export default function Settings() {
             <RolesSettings />
         </TabsContent>
         <TabsContent value="tags">
-            <TagsSettings initialTagId={tagIdFromQuery} />
+            <TagsSettings />
         </TabsContent>
         <TabsContent value="semantic-models">
             <SemanticModelsSettings />

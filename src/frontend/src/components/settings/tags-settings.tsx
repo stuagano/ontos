@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
-import { MoreHorizontal, Plus, Trash2, Edit, Settings, Tag, Hash, Users, Loader2, AlertCircle, X, ExternalLink, Package, FileText, Database, Eye } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { MoreHorizontal, Plus, Trash2, Edit, Settings, Tag, Hash, Users, Loader2, AlertCircle, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable } from '@/components/ui/data-table';
@@ -46,6 +45,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useApi } from '@/hooks/use-api';
 import { useToast } from '@/hooks/use-toast';
 import { RelativeDate } from '@/components/common/relative-date';
+import { useAppSettingsStore } from '@/stores/app-settings-store';
 
 // Types based on backend models
 interface TagNamespace {
@@ -103,21 +103,10 @@ interface PermissionFormData {
   access_level: string;
 }
 
-interface AssignedEntity {
-  entity_id: string;
-  entity_type: string;
-  assigned_value?: string;
-  assigned_by?: string;
-  assigned_at: string;
-}
-
-interface TagsSettingsProps {
-  initialTagId?: string | null;
-}
-
-export default function TagsSettings({ initialTagId }: TagsSettingsProps) {
+export default function TagsSettings() {
   const { get, post, put, delete: deleteApi, loading } = useApi();
   const { toast } = useToast();
+  const { setTagDisplayFormat: setGlobalTagDisplayFormat } = useAppSettingsStore();
 
   // State
   const [namespaces, setNamespaces] = useState<TagNamespace[]>([]);
@@ -129,11 +118,6 @@ export default function TagsSettings({ initialTagId }: TagsSettingsProps) {
   const [tagDisplayFormat, setTagDisplayFormat] = useState<'short' | 'long'>('short');
   const [isLoadingDisplayFormat, setIsLoadingDisplayFormat] = useState(false);
   const [isSavingDisplayFormat, setIsSavingDisplayFormat] = useState(false);
-  
-  // Selected tag detail view state
-  const [selectedTag, setSelectedTag] = useState<Tag | null>(null);
-  const [assignedEntities, setAssignedEntities] = useState<AssignedEntity[]>([]);
-  const [isLoadingEntities, setIsLoadingEntities] = useState(false);
 
   // Dialog states
   const [isNamespaceDialogOpen, setIsNamespaceDialogOpen] = useState(false);
@@ -202,33 +186,6 @@ export default function TagsSettings({ initialTagId }: TagsSettingsProps) {
     }
   }, [get, toast, selectedNamespace]);
 
-  // Fetch a specific tag and its assigned entities
-  const fetchTagDetails = useCallback(async (tagId: string) => {
-    setIsLoadingEntities(true);
-    try {
-      // Fetch tag details
-      const tagResponse = await get<Tag>(`/api/tags/${tagId}`);
-      if (tagResponse.data) {
-        setSelectedTag(tagResponse.data);
-        // Set the namespace to match the tag's namespace
-        if (tagResponse.data.namespace_id) {
-          setSelectedNamespace(tagResponse.data.namespace_id);
-        }
-      }
-      
-      // Fetch entities assigned to this tag
-      const entitiesResponse = await get<AssignedEntity[]>(`/api/tags/${tagId}/entities`);
-      if (entitiesResponse.data) {
-        setAssignedEntities(entitiesResponse.data);
-      }
-    } catch (err: any) {
-      console.error('Error fetching tag details:', err);
-      toast({ variant: 'destructive', title: 'Error fetching tag details', description: err.message });
-    } finally {
-      setIsLoadingEntities(false);
-    }
-  }, [get, toast]);
-
   // Fetch tag display format setting
   const fetchDisplayFormat = useCallback(async () => {
     setIsLoadingDisplayFormat(true);
@@ -250,6 +207,8 @@ export default function TagsSettings({ initialTagId }: TagsSettingsProps) {
     try {
       await put('/api/settings', { tag_display_format: format });
       setTagDisplayFormat(format);
+      // Also update the global store so all TagChips update immediately
+      setGlobalTagDisplayFormat(format);
       toast({ title: 'Tag display format updated' });
     } catch (err: any) {
       toast({ variant: 'destructive', title: 'Error saving display format', description: err.message });
@@ -269,13 +228,6 @@ export default function TagsSettings({ initialTagId }: TagsSettingsProps) {
       fetchPermissions();
     }
   }, [selectedNamespace, fetchTags, fetchPermissions]);
-  
-  // Handle initialTagId prop - fetch the specific tag when provided
-  useEffect(() => {
-    if (initialTagId) {
-      fetchTagDetails(initialTagId);
-    }
-  }, [initialTagId, fetchTagDetails]);
 
   // Namespace operations
   const openNamespaceDialog = (namespace?: TagNamespace) => {
@@ -526,20 +478,6 @@ export default function TagsSettings({ initialTagId }: TagsSettingsProps) {
     );
   }
 
-  // Helper to get icon and link for entity types
-  const getEntityInfo = (entityType: string, entityId: string) => {
-    switch (entityType) {
-      case 'data_product':
-        return { icon: Package, label: 'Data Product', link: `/data-products/${entityId}` };
-      case 'data_contract':
-        return { icon: FileText, label: 'Data Contract', link: `/data-contracts/${entityId}` };
-      case 'dataset':
-        return { icon: Database, label: 'Dataset', link: `/datasets/${entityId}` };
-      default:
-        return { icon: Tag, label: entityType, link: null };
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Tag Display Settings */}
@@ -565,12 +503,12 @@ export default function TagsSettings({ initialTagId }: TagsSettingsProps) {
               onValueChange={(value: 'short' | 'long') => saveDisplayFormat(value)}
               disabled={isLoadingDisplayFormat || isSavingDisplayFormat}
             >
-              <SelectTrigger id="display-format-select" className="w-[200px]">
+              <SelectTrigger id="display-format-select" className="w-[240px]">
                 <SelectValue placeholder="Select format" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="short">Short (tag name only)</SelectItem>
-                <SelectItem value="long">Long (namespace/tag name)</SelectItem>
+                <SelectItem value="short" className="whitespace-nowrap">Short (tag name only)</SelectItem>
+                <SelectItem value="long" className="whitespace-nowrap">Long (namespace/tag name)</SelectItem>
               </SelectContent>
             </Select>
             {(isLoadingDisplayFormat || isSavingDisplayFormat) && (
@@ -583,89 +521,6 @@ export default function TagsSettings({ initialTagId }: TagsSettingsProps) {
           </p>
         </CardContent>
       </Card>
-
-      {/* Selected Tag Details Panel */}
-      {selectedTag && (
-        <Card className="border-primary">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Tag className="h-5 w-5 text-primary" />
-                  {selectedTag.fully_qualified_name}
-                </CardTitle>
-                <CardDescription>
-                  {selectedTag.description || 'No description'}
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant={selectedTag.status === 'active' ? 'default' : 'secondary'}>
-                  {selectedTag.status}
-                </Badge>
-                <Button variant="ghost" size="sm" onClick={() => { setSelectedTag(null); setAssignedEntities([]); }}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Namespace:</span>
-                  <span className="ml-2 font-medium">{selectedTag.namespace_name}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Version:</span>
-                  <span className="ml-2 font-medium">{selectedTag.version || '—'}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Updated:</span>
-                  <span className="ml-2"><RelativeDate date={selectedTag.updated_at} /></span>
-                </div>
-              </div>
-              
-              <div className="border-t pt-4">
-                <h4 className="font-medium mb-3 flex items-center gap-2">
-                  Assigned Entities
-                  {isLoadingEntities && <Loader2 className="h-4 w-4 animate-spin" />}
-                  <Badge variant="outline">{assignedEntities.length}</Badge>
-                </h4>
-                
-                {assignedEntities.length === 0 && !isLoadingEntities ? (
-                  <p className="text-sm text-muted-foreground">No entities are assigned this tag.</p>
-                ) : (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {assignedEntities.map((entity, idx) => {
-                      const info = getEntityInfo(entity.entity_type, entity.entity_id);
-                      const IconComponent = info.icon;
-                      return (
-                        <div key={idx} className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted">
-                          <div className="flex items-center gap-2">
-                            <IconComponent className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium">{info.label}</span>
-                            <span className="text-sm text-muted-foreground font-mono">{entity.entity_id.substring(0, 8)}...</span>
-                            {entity.assigned_value && (
-                              <Badge variant="outline" className="text-xs">{entity.assigned_value}</Badge>
-                            )}
-                          </div>
-                          {info.link && (
-                            <Link to={info.link}>
-                              <Button variant="ghost" size="sm">
-                                <ExternalLink className="h-4 w-4" />
-                              </Button>
-                            </Link>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Namespaces Management */}
       <Card>

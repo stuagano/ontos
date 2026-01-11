@@ -372,6 +372,8 @@ class TagsManager(SearchableAsset):
                         "status": tag_api_model.status.value if tag_api_model.status else "",
                     }
 
+                    # Link to search view with tag filter to show all entities with this tag
+                    search_query = f"tag:{tag_api_model.fully_qualified_name}"
                     items.append(
                         SearchIndexItem(
                             id=f"tag::{tag_api_model.id}",
@@ -380,7 +382,7 @@ class TagsManager(SearchableAsset):
                             title=tag_api_model.fully_qualified_name,
                             description=tag_api_model.description
                             or f"Tag: {tag_api_model.name} in namespace {tag_api_model.namespace_name}",
-                            link=f"/settings/tags?tagId={tag_api_model.id}",
+                            link=f"/search?tab=app&app_query={search_query}",
                             tags=[
                                 tag_api_model.name,
                                 tag_api_model.namespace_name or DEFAULT_NAMESPACE_NAME,

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { X, Info } from 'lucide-react';
@@ -8,6 +8,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { useAppSettingsStore } from '@/stores/app-settings-store';
 
 // Type for rich tag object (matches backend AssignedTag)
 export interface AssignedTag {
@@ -79,16 +80,26 @@ const TagChip: React.FC<TagChipProps> = ({
   size = 'md',
   variant,
   clickable = true,
-  displayFormat = 'short',
+  displayFormat,
 }) => {
   const navigate = useNavigate();
+  const { tagDisplayFormat: globalFormat, fetchSettings } = useAppSettingsStore();
+  
+  // Fetch global settings on first render
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+  
+  // Use explicit prop if provided, otherwise use global setting
+  const effectiveDisplayFormat = displayFormat ?? globalFormat;
+  
   const isRichTag = typeof tag === 'object';
   const tagName = isRichTag ? tag.tag_name : tag;
   
   // Determine display name based on format
   const getDisplayName = () => {
     if (isRichTag) {
-      const baseName = displayFormat === 'long' ? tag.fully_qualified_name : tag.tag_name;
+      const baseName = effectiveDisplayFormat === 'long' ? tag.fully_qualified_name : tag.tag_name;
       return tag.assigned_value ? `${baseName}: ${tag.assigned_value}` : baseName;
     }
     return tag;
