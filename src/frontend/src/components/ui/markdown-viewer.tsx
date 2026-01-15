@@ -123,16 +123,36 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ markdown }) => {
         hr: () => (
           <hr className="my-8 border-t border-border" />
         ),
-        a: ({ children, href }) => (
-          <a
-            href={href}
-            className="text-primary font-medium underline underline-offset-4 decoration-primary/30 hover:decoration-primary transition-colors"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {children}
-          </a>
-        ),
+        a: ({ children, href }) => {
+          const isInternalAnchor = href?.startsWith('#');
+          const handleClick = isInternalAnchor
+            ? (e: React.MouseEvent) => {
+                e.preventDefault();
+                const id = href.slice(1);
+                const element = document.getElementById(id);
+                if (element) {
+                  const offset = 80;
+                  const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+                  window.scrollTo({
+                    top: elementPosition - offset,
+                    behavior: 'smooth'
+                  });
+                  // Update URL without triggering navigation
+                  window.history.pushState(null, '', href);
+                }
+              }
+            : undefined;
+          return (
+            <a
+              href={href}
+              onClick={handleClick}
+              className="text-primary font-medium underline underline-offset-4 decoration-primary/30 hover:decoration-primary transition-colors"
+              {...(!isInternalAnchor && { target: '_blank', rel: 'noopener noreferrer' })}
+            >
+              {children}
+            </a>
+          );
+        },
         img: ({ src, alt }) => (
           <div className="my-8">
             <img

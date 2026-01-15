@@ -75,6 +75,30 @@ export default function UserGuide() {
   // Build table of contents
   const toc = useMemo(() => buildToc(markdown), [markdown]);
 
+  // Scroll to hash anchor on initial load (after content is loaded)
+  useEffect(() => {
+    if (!markdown || loading) return;
+    
+    const hash = window.location.hash;
+    if (hash) {
+      // Small delay to ensure DOM is fully rendered
+      const timeoutId = setTimeout(() => {
+        const id = hash.slice(1);
+        const element = document.getElementById(id);
+        if (element) {
+          const offset = 80;
+          const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+          window.scrollTo({
+            top: elementPosition - offset,
+            behavior: 'smooth'
+          });
+          setActiveSection(id);
+        }
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [markdown, loading]);
+
   // Track active section on scroll
   useEffect(() => {
     if (toc.length === 0) return;
