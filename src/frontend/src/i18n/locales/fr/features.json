@@ -3,6 +3,10 @@
     "name": "Domaines",
     "description": "Organisez les produits de données et les actifs en domaines logiques."
   },
+  "datasets": {
+    "name": "Jeux de données",
+    "description": "Gérez les jeux de données et leurs implémentations physiques dans différents environnements."
+  },
   "teams": {
     "name": "Équipes",
     "description": "Gérez les équipes et les membres d'équipe avec des remplacements de rôles."

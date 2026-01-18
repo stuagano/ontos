@@ -3,6 +3,10 @@
     "name": "Domains",
     "description": "Organize data products and assets into logical domains."
   },
+  "datasets": {
+    "name": "Datasets",
+    "description": "Manage datasets and their physical implementations across environments."
+  },
   "teams": {
     "name": "Teams",
     "description": "Manage teams and team members with role overrides."

@@ -3,6 +3,10 @@
     "name": "Domini",
     "description": "Organizza prodotti dati e risorse in domini logici."
   },
+  "datasets": {
+    "name": "Dataset",
+    "description": "Gestisci dataset e le loro implementazioni fisiche tra ambienti."
+  },
   "teams": {
     "name": "Team",
     "description": "Gestisci team e membri del team con sovrascritture dei ruoli."

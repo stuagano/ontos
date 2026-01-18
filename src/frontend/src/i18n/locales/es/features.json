@@ -3,6 +3,10 @@
     "name": "Dominios",
     "description": "Organiza productos de datos y activos en dominios lógicos."
   },
+  "datasets": {
+    "name": "Conjuntos de Datos",
+    "description": "Gestiona conjuntos de datos y sus implementaciones físicas a través de entornos."
+  },
   "teams": {
     "name": "Equipos",
     "description": "Gestiona equipos y miembros de equipo con sobrescrituras de roles."

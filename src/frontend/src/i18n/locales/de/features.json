@@ -3,6 +3,10 @@
     "name": "Domänen",
     "description": "Datenprodukte und Assets in logische Domänen organisieren."
   },
+  "datasets": {
+    "name": "Datensätze",
+    "description": "Datensätze und ihre physischen Implementierungen über Umgebungen hinweg verwalten."
+  },
   "teams": {
     "name": "Teams",
     "description": "Teams und Teammitglieder mit Rollen-Overrides verwalten."
