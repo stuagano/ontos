@@ -139,11 +139,11 @@ class Settings(BaseSettings):
     )
 
     # Sandbox allowlist settings
-    sandbox_default_schema: str = Field('sandbox', env='SANDBOX_DEFAULT_SCHEMA')
-    sandbox_allowed_catalog_prefixes: List[str] = Field(default_factory=lambda: ['user_'], env='SANDBOX_ALLOWED_CATALOG_PREFIXES')
-    sandbox_allowed_catalogs: List[str] = Field(default_factory=list, env='SANDBOX_ALLOWED_CATALOGS')
-    sandbox_allowed_schemas: List[str] = Field(default_factory=lambda: ['sandbox'], env='SANDBOX_ALLOWED_SCHEMAS')
-    sandbox_enforce_allowlist: bool = Field(True, env='SANDBOX_ENFORCE_ALLOWLIST')
+    sandbox_default_schema: str = Field('sandbox', validation_alias=AliasChoices('SANDBOX_DEFAULT_SCHEMA', 'sandbox_default_schema'))
+    sandbox_allowed_catalog_prefixes: List[str] = Field(default_factory=lambda: ['user_'], validation_alias=AliasChoices('SANDBOX_ALLOWED_CATALOG_PREFIXES', 'sandbox_allowed_catalog_prefixes'))
+    sandbox_allowed_catalogs: List[str] = Field(default_factory=list, validation_alias=AliasChoices('SANDBOX_ALLOWED_CATALOGS', 'sandbox_allowed_catalogs'))
+    sandbox_allowed_schemas: List[str] = Field(default_factory=lambda: ['sandbox'], validation_alias=AliasChoices('SANDBOX_ALLOWED_SCHEMAS', 'sandbox_allowed_schemas'))
+    sandbox_enforce_allowlist: bool = Field(True, validation_alias=AliasChoices('SANDBOX_ENFORCE_ALLOWLIST', 'sandbox_enforce_allowlist'))
 
     # Replace nested Config class with model_config dictionary
     model_config = SettingsConfigDict(
