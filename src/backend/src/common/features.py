@@ -118,10 +118,6 @@ APP_FEATURES: Dict[str, Dict[str, str | List[FeatureAccessLevel]]] = {
         'name': 'Settings',
         'allowed_levels': ADMIN_ONLY_LEVELS # Only Admins change settings
     },
-    'workflows': {
-        'name': 'Workflows',
-        'allowed_levels': READ_WRITE_ADMIN_LEVELS # Manage process workflows
-    },
     'semantic-models': {
         'name': 'Semantic Models',
         'allowed_levels': READ_WRITE_ADMIN_LEVELS
