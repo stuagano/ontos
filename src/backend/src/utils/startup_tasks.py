@@ -301,6 +301,13 @@ def initialize_managers(app: FastAPI):
             logger.info("APP_DEMO_MODE and APP_DB_DROP_ON_START both enabled - loading demo data...")
             try:
                 load_demo_data_from_sql()
+                # Rebuild semantic models cache to include demo data
+                if hasattr(app.state, 'semantic_models_manager') and app.state.semantic_models_manager:
+                    try:
+                        app.state.semantic_models_manager.rebuild_graph_from_enabled()
+                        logger.info("Rebuilt semantic models cache to include demo data.")
+                    except Exception as e:
+                        logger.warning(f"Failed to rebuild semantic models cache: {e}")
             except Exception as e:
                 logger.error(f"Failed to load demo data: {e}", exc_info=True)
                 # Don't fail startup if demo data loading fails

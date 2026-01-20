@@ -98,16 +98,16 @@ import {
       showInLanding: true,
     },
     // Governance - Standards definition and approval workflows
-    {
-      id: 'semantic-models',
-      name: 'Semantic Models',
-      path: '/semantic-models',
-      description: 'Explore semantic models and their terms (concepts and properties).',
-      icon: Network,
-      group: 'Governance',
-      maturity: 'ga',
-      showInLanding: true,
-    },
+  {
+    id: 'semantic-models',
+    name: 'Business Glossary',
+    path: '/semantic-models',
+    description: 'Explore business glossary terms, concepts, and their relationships.',
+    icon: Network,
+    group: 'Governance',
+    maturity: 'ga',
+    showInLanding: true,
+  },
     {
       id: 'data-asset-reviews',
       name: 'Asset Review',

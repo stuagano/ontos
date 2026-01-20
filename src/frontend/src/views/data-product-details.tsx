@@ -29,6 +29,7 @@ import LinkedConceptChips from '@/components/semantic/linked-concept-chips';
 import type { EntitySemanticLink } from '@/types/semantic-link';
 import EntityMetadataPanel from '@/components/metadata/entity-metadata-panel';
 import { CommentSidebar } from '@/components/comments';
+import { RatingPanel } from '@/components/ratings';
 import { useDomains } from '@/hooks/use-domains';
 import RequestProductActionDialog from '@/components/data-products/request-product-action-dialog';
 import CommitDraftDialog from '@/components/data-products/commit-draft-dialog';
@@ -1573,6 +1574,15 @@ export default function DataProductDetails() {
 
       {/* Metadata Panel */}
       <EntityMetadataPanel entityId={productId!} entityType="data_product" />
+
+      {/* Ratings Panel */}
+      <RatingPanel
+        entityType="data_product"
+        entityId={productId!}
+        title={t('details.ratings.title', 'Ratings & Reviews')}
+        showDistribution
+        allowSubmit={canRead}
+      />
 
       {/* Costs Panel */}
       <EntityCostsPanel entityId={productId!} entityType="data_product" />

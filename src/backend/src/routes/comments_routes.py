@@ -10,7 +10,7 @@ from src.common.config import get_settings, Settings
 from src.controller.comments_manager import CommentsManager
 from src.controller.change_log_manager import change_log_manager
 from src.common.manager_dependencies import get_comments_manager
-from src.models.comments import Comment, CommentCreate, CommentUpdate, CommentListResponse
+from src.models.comments import Comment, CommentCreate, CommentUpdate, CommentListResponse, RatingCreate, RatingAggregation
 from src.repositories.teams_repository import team_repo
 
 from src.common.logging import get_logger
@@ -490,6 +490,123 @@ async def check_comment_permissions(
     except Exception as e:
         logger.exception("Failed checking comment permissions for %s", comment_id)
         raise HTTPException(status_code=500, detail="Failed to check comment permissions")
+
+
+# =============================================================================
+# Rating Endpoints
+# =============================================================================
+
+@router.post("/entities/{entity_type}/{entity_id}/ratings", response_model=Comment, status_code=status.HTTP_201_CREATED)
+async def create_rating(
+    entity_type: str,
+    entity_id: str,
+    payload: RatingCreate,
+    request: Request,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+    audit_manager: AuditManagerDep,
+    audit_user: AuditCurrentUserDep,
+    manager: CommentsManager = Depends(get_comments_manager),
+    _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_WRITE)),
+):
+    """Create a star rating for an entity.
+    
+    Each user can submit multiple ratings over time. The latest rating
+    is considered the user's "current" rating for aggregation purposes.
+    """
+    success = False
+    details = {
+        "params": {
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "rating": payload.rating,
+        }
+    }
+
+    try:
+        # Validate that path matches payload
+        if payload.entity_type != entity_type or payload.entity_id != entity_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Entity path does not match request body"
+            )
+
+        result = manager.create_rating(
+            db,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            rating=payload.rating,
+            comment=payload.comment,
+            project_id=payload.project_id,
+            user_email=current_user.email
+        )
+        success = True
+        details["rating_id"] = str(result.id)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed creating rating for %s/%s", entity_type, entity_id)
+        details["exception"] = {"type": type(e).__name__, "message": str(e)}
+        raise HTTPException(status_code=500, detail="Failed to create rating")
+    finally:
+        audit_manager.log_action(
+            db=db,
+            username=audit_user.username,
+            ip_address=request.client.host if request.client else None,
+            feature="ratings",
+            action="CREATE",
+            success=success,
+            details=details
+        )
+
+
+@router.get("/entities/{entity_type}/{entity_id}/ratings", response_model=RatingAggregation)
+async def get_entity_ratings(
+    entity_type: str,
+    entity_id: str,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+    manager: CommentsManager = Depends(get_comments_manager),
+    _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_ONLY)),
+):
+    """Get aggregated ratings for an entity.
+    
+    Returns average rating, total count, distribution, and current user's rating.
+    """
+    try:
+        return manager.get_rating_aggregation(
+            db,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            user_email=current_user.email
+        )
+    except Exception as e:
+        logger.exception("Failed getting ratings for %s/%s", entity_type, entity_id)
+        raise HTTPException(status_code=500, detail="Failed to get ratings")
+
+
+@router.get("/entities/{entity_type}/{entity_id}/ratings/history", response_model=CommentListResponse)
+async def get_rating_history(
+    entity_type: str,
+    entity_id: str,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+    user_only: bool = Query(False, description="Only show current user's ratings"),
+    manager: CommentsManager = Depends(get_comments_manager),
+    _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_ONLY)),
+):
+    """Get rating history for an entity (all individual rating entries)."""
+    try:
+        return manager.list_ratings(
+            db,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            user_email=current_user.email if user_only else None
+        )
+    except Exception as e:
+        logger.exception("Failed getting rating history for %s/%s", entity_type, entity_id)
+        raise HTTPException(status_code=500, detail="Failed to get rating history")
 
 
 def register_routes(app):

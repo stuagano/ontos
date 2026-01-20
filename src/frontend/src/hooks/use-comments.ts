@@ -7,6 +7,8 @@ import {
   CommentUpdate,
   CommentListResponse,
   CommentPermissions,
+  RatingCreate,
+  RatingAggregation,
 } from '@/types/comments';
 
 export const useComments = (entityType?: string, entityId?: string) => {
@@ -15,6 +17,7 @@ export const useComments = (entityType?: string, entityId?: string) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [visibleCount, setVisibleCount] = useState(0);
+  const [ratingAggregation, setRatingAggregation] = useState<RatingAggregation | null>(null);
 
   const fetchComments = useCallback(async (
     entityTypeParam?: string, 
@@ -166,6 +169,105 @@ export const useComments = (entityType?: string, entityId?: string) => {
     return response.data;
   }, [get, toast]);
 
+  // =========================================================================
+  // Rating-specific methods
+  // =========================================================================
+
+  const createRating = useCallback(async (
+    entityTypeParam: string,
+    entityIdParam: string,
+    rating: number,
+    reviewText?: string,
+    projectId?: string
+  ) => {
+    const payload: RatingCreate = {
+      entity_type: entityTypeParam,
+      entity_id: entityIdParam,
+      rating,
+      comment: reviewText,
+      project_id: projectId,
+    };
+
+    const response = await post<Comment>(
+      `/api/entities/${entityTypeParam}/${entityIdParam}/ratings`,
+      payload
+    );
+    
+    if (response.error) {
+      toast({
+        title: 'Error',
+        description: `Failed to submit rating: ${response.error}`,
+        variant: 'destructive',
+      });
+      throw new Error(response.error);
+    }
+    
+    toast({
+      title: 'Success',
+      description: 'Rating submitted successfully',
+    });
+    
+    // Refresh rating aggregation after submission
+    await fetchRatingAggregation(entityTypeParam, entityIdParam);
+    
+    return response.data;
+  }, [post, toast]);
+
+  const fetchRatingAggregation = useCallback(async (
+    entityTypeParam?: string,
+    entityIdParam?: string
+  ) => {
+    const type = entityTypeParam || entityType;
+    const id = entityIdParam || entityId;
+    
+    if (!type || !id) {
+      console.warn('useComments: entityType and entityId are required for fetchRatingAggregation');
+      return null;
+    }
+
+    const response = await get<RatingAggregation>(
+      `/api/entities/${type}/${id}/ratings`
+    );
+    
+    if (response.error) {
+      console.error('Failed to fetch ratings:', response.error);
+      return null;
+    }
+    
+    setRatingAggregation(response.data);
+    return response.data;
+  }, [get, entityType, entityId]);
+
+  const fetchRatingHistory = useCallback(async (
+    entityTypeParam?: string,
+    entityIdParam?: string,
+    userOnly = false
+  ) => {
+    const type = entityTypeParam || entityType;
+    const id = entityIdParam || entityId;
+    
+    if (!type || !id) {
+      console.warn('useComments: entityType and entityId are required for fetchRatingHistory');
+      return null;
+    }
+
+    const queryParams = userOnly ? '?user_only=true' : '';
+    const response = await get<CommentListResponse>(
+      `/api/entities/${type}/${id}/ratings/history${queryParams}`
+    );
+    
+    if (response.error) {
+      toast({
+        title: 'Error',
+        description: `Failed to load rating history: ${response.error}`,
+        variant: 'destructive',
+      });
+      return null;
+    }
+    
+    return response.data;
+  }, [get, toast, entityType, entityId]);
+
   return {
     comments,
     totalCount,
@@ -177,5 +279,10 @@ export const useComments = (entityType?: string, entityId?: string) => {
     deleteComment,
     checkCommentPermissions,
     getComment,
+    // Rating-specific exports
+    ratingAggregation,
+    createRating,
+    fetchRatingAggregation,
+    fetchRatingHistory,
   };
 };

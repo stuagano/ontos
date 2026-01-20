@@ -134,34 +134,38 @@ export default function SelfServiceDialog({ isOpen, onOpenChange, initialType }:
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
+      <DialogContent 
+        className="max-w-3xl max-h-[90vh] flex flex-col overflow-hidden"
+        style={{ top: '5%', transform: 'translateX(-50%)' }}
+      >
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Self-service data curation</DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <Label>What to create</Label>
-              <Select value={createType} onValueChange={(v) => setCreateType(v as CreateType)}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="Select type" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="catalog">Catalog</SelectItem>
-                  <SelectItem value="schema">Schema</SelectItem>
-                  <SelectItem value="table">Table</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Catalog</Label>
-              <Input value={catalog} onChange={(e) => setCatalog(e.target.value)} placeholder="e.g. user_jdoe" />
-            </div>
-            <div>
-              <Label>Schema</Label>
-              <Input value={schema} onChange={(e) => setSchema(e.target.value)} placeholder="e.g. sandbox" />
-            </div>
+        {/* Top fields outside scroll area to prevent dropdown clipping */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-shrink-0">
+          <div>
+            <Label>What to create</Label>
+            <Select value={createType} onValueChange={(v) => setCreateType(v as CreateType)}>
+              <SelectTrigger className="w-full"><SelectValue placeholder="Select type" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="catalog">Catalog</SelectItem>
+                <SelectItem value="schema">Schema</SelectItem>
+                <SelectItem value="table">Table</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+          <div>
+            <Label>Catalog</Label>
+            <Input value={catalog} onChange={(e) => setCatalog(e.target.value)} placeholder="e.g. user_jdoe" />
+          </div>
+          <div>
+            <Label>Schema</Label>
+            <Input value={schema} onChange={(e) => setSchema(e.target.value)} placeholder="e.g. sandbox" />
+          </div>
+        </div>
 
+        <div className="grid gap-4 overflow-y-auto flex-1 min-h-0 pr-2">
           {createType === 'table' && (
             <Card>
               <CardHeader>
@@ -204,10 +208,16 @@ export default function SelfServiceDialog({ isOpen, onOpenChange, initialType }:
               <AlertDescription>
                 <p className="mb-2">{workflowErrors.message}</p>
                 <div className="space-y-2">
-                  {workflowErrors.workflows.map((wf, i) => (
-                    <div key={i} className="border rounded p-2 bg-destructive/5">
-                      <div className="flex items-center gap-2 font-medium">
-                        <XCircle className="h-4 w-4" />
+                  {workflowErrors.workflows.map((wf, i) => {
+                  const isPassed = wf.status === 'succeeded' || wf.status === 'passed';
+                  return (
+                    <div key={i} className={`border rounded p-2 ${isPassed ? 'bg-green-50 dark:bg-green-950/20' : 'bg-destructive/5'}`}>
+                      <div className={`flex items-center gap-2 font-medium ${isPassed ? 'text-green-700 dark:text-green-400' : ''}`}>
+                        {isPassed ? (
+                          <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-destructive" />
+                        )}
                         {wf.workflow_name}
                         <Badge variant="outline" className="ml-auto">{wf.status}</Badge>
                       </div>
@@ -230,7 +240,8 @@ export default function SelfServiceDialog({ isOpen, onOpenChange, initialType }:
                         <p className="mt-1 text-sm pl-6">{wf.error}</p>
                       )}
                     </div>
-                  ))}
+                  );
+                })}
                 </div>
                 <p className="mt-3 text-sm">Please fix the issues above and try again.</p>
               </AlertDescription>

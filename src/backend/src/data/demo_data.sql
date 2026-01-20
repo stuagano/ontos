@@ -600,7 +600,83 @@ INSERT INTO rdf_triples (id, subject_uri, predicate_uri, object_value, object_is
 ('02000053-0000-4000-8000-000000000053', 'http://demo.ontos.app/glossary#DeviceType', 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', 'http://www.w3.org/2004/02/skos/core#Concept', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
 ('02000054-0000-4000-8000-000000000054', 'http://demo.ontos.app/glossary#DeviceType', 'http://www.w3.org/2000/01/rdf-schema#label', 'Device Type', false, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
 ('02000055-0000-4000-8000-000000000055', 'http://demo.ontos.app/glossary#DeviceStatus', 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', 'http://www.w3.org/2004/02/skos/core#Concept', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
-('02000056-0000-4000-8000-000000000056', 'http://demo.ontos.app/glossary#DeviceStatus', 'http://www.w3.org/2000/01/rdf-schema#label', 'Device Status', false, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW())
+('02000056-0000-4000-8000-000000000056', 'http://demo.ontos.app/glossary#DeviceStatus', 'http://www.w3.org/2000/01/rdf-schema#label', 'Device Status', false, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+
+-- Hierarchy Relationships (skos:broader) - Business Concepts under their Domains
+-- Sale -> SalesDomain
+('02000101-0000-4000-8000-000000000101', 'http://demo.ontos.app/concepts#Sale', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/concepts#SalesDomain', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- Transaction -> FinancialDomain
+('02000102-0000-4000-8000-000000000102', 'http://demo.ontos.app/concepts#Transaction', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/concepts#FinancialDomain', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- Customer -> CustomerDomain
+('02000103-0000-4000-8000-000000000103', 'http://demo.ontos.app/concepts#Customer', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/concepts#CustomerDomain', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- Inventory -> ProductDomain
+('02000104-0000-4000-8000-000000000104', 'http://demo.ontos.app/concepts#Inventory', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/concepts#ProductDomain', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- Product -> ProductDomain
+('02000105-0000-4000-8000-000000000105', 'http://demo.ontos.app/concepts#Product', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/concepts#ProductDomain', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+
+-- Glossary Terms under their parent concepts/domains
+-- Customer glossary term -> Customer concept
+('02000111-0000-4000-8000-000000000111', 'http://demo.ontos.app/glossary#Customer', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/concepts#Customer', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- PersonalData -> CustomerDomain
+('02000112-0000-4000-8000-000000000112', 'http://demo.ontos.app/glossary#PersonalData', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/concepts#CustomerDomain', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- Product glossary term -> Product concept
+('02000113-0000-4000-8000-000000000113', 'http://demo.ontos.app/glossary#Product', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/concepts#Product', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- Inventory glossary term -> Inventory concept
+('02000114-0000-4000-8000-000000000114', 'http://demo.ontos.app/glossary#Inventory', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/concepts#Inventory', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- Device -> ProductDomain
+('02000115-0000-4000-8000-000000000115', 'http://demo.ontos.app/glossary#Device', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/concepts#ProductDomain', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- Telemetry -> Device
+('02000116-0000-4000-8000-000000000116', 'http://demo.ontos.app/glossary#Telemetry', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#Device', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- Transaction glossary term -> Transaction concept
+('02000117-0000-4000-8000-000000000117', 'http://demo.ontos.app/glossary#Transaction', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/concepts#Transaction', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- FinancialRecord -> FinancialDomain
+('02000118-0000-4000-8000-000000000118', 'http://demo.ontos.app/glossary#FinancialRecord', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/concepts#FinancialDomain', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- CustomerProfile -> Customer glossary
+('02000119-0000-4000-8000-000000000119', 'http://demo.ontos.app/glossary#CustomerProfile', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#Customer', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- MasterData -> CustomerDomain
+('0200011a-0000-4000-8000-00000000011a', 'http://demo.ontos.app/glossary#MasterData', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/concepts#CustomerDomain', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- CustomerPreference -> CustomerProfile
+('0200011b-0000-4000-8000-00000000011b', 'http://demo.ontos.app/glossary#CustomerPreference', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#CustomerProfile', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- Address -> CustomerProfile
+('0200011c-0000-4000-8000-00000000011c', 'http://demo.ontos.app/glossary#Address', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#CustomerProfile', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- ContactInformation -> CustomerProfile
+('0200011d-0000-4000-8000-00000000011d', 'http://demo.ontos.app/glossary#ContactInformation', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#CustomerProfile', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- IoTDevice -> Device
+('0200011e-0000-4000-8000-00000000011e', 'http://demo.ontos.app/glossary#IoTDevice', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#Device', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- AssetRegistry -> Device
+('0200011f-0000-4000-8000-00000000011f', 'http://demo.ontos.app/glossary#AssetRegistry', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#Device', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- SensorReading -> Telemetry
+('02000120-0000-4000-8000-000000000120', 'http://demo.ontos.app/glossary#SensorReading', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#Telemetry', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- DeviceEvent -> Telemetry
+('02000121-0000-4000-8000-000000000121', 'http://demo.ontos.app/glossary#DeviceEvent', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#Telemetry', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- Alert -> DeviceEvent
+('02000122-0000-4000-8000-000000000122', 'http://demo.ontos.app/glossary#Alert', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#DeviceEvent', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- CustomerId -> Customer glossary
+('02000123-0000-4000-8000-000000000123', 'http://demo.ontos.app/glossary#CustomerId', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#Customer', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- UniqueIdentifier -> MasterData
+('02000124-0000-4000-8000-000000000124', 'http://demo.ontos.app/glossary#UniqueIdentifier', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#MasterData', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- EmailAddress -> ContactInformation
+('02000125-0000-4000-8000-000000000125', 'http://demo.ontos.app/glossary#EmailAddress', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#ContactInformation', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- PII -> PersonalData
+('02000126-0000-4000-8000-000000000126', 'http://demo.ontos.app/glossary#PII', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#PersonalData', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- FirstName -> PII
+('02000127-0000-4000-8000-000000000127', 'http://demo.ontos.app/glossary#FirstName', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#PII', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- LastName -> PII
+('02000128-0000-4000-8000-000000000128', 'http://demo.ontos.app/glossary#LastName', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#PII', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- DateOfBirth -> PII
+('02000129-0000-4000-8000-000000000129', 'http://demo.ontos.app/glossary#DateOfBirth', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#PII', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- PhoneNumber -> ContactInformation
+('0200012a-0000-4000-8000-00000000012a', 'http://demo.ontos.app/glossary#PhoneNumber', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#ContactInformation', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- CountryCode -> Address
+('0200012b-0000-4000-8000-00000000012b', 'http://demo.ontos.app/glossary#CountryCode', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#Address', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- AccountStatus -> Customer glossary
+('0200012c-0000-4000-8000-00000000012c', 'http://demo.ontos.app/glossary#AccountStatus', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#Customer', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- DeviceId -> Device
+('0200012d-0000-4000-8000-00000000012d', 'http://demo.ontos.app/glossary#DeviceId', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#Device', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- DeviceType -> Device
+('0200012e-0000-4000-8000-00000000012e', 'http://demo.ontos.app/glossary#DeviceType', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#Device', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW()),
+-- DeviceStatus -> Device
+('0200012f-0000-4000-8000-00000000012f', 'http://demo.ontos.app/glossary#DeviceStatus', 'http://www.w3.org/2004/02/skos/core#broader', 'http://demo.ontos.app/glossary#Device', true, 'urn:demo', 'demo', 'demo_data.sql', 'system@demo', NOW())
 
 ON CONFLICT (id) DO NOTHING;
 

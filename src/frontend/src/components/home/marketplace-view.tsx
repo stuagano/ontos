@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import EntityInfoDialog from '@/components/metadata/entity-info-dialog';
 import SubscribeDialog from '@/components/data-products/subscribe-dialog';
 import { DataDomainMiniGraph } from '@/components/data-domains/data-domain-mini-graph';
+import { RatingBadge } from '@/components/ratings';
 
 // Asset type for marketplace browsing
 type MarketplaceAssetType = 'products' | 'datasets';
@@ -527,6 +528,13 @@ export default function MarketplaceView({ className }: MarketplaceViewProps) {
                 {product.status}
               </Badge>
             )}
+            {product.id && (
+              <RatingBadge
+                entityType="data_product"
+                entityId={product.id}
+                size="sm"
+              />
+            )}
           </div>
           <div className="text-xs text-muted-foreground mt-2 truncate">
             {t('marketplace.products.owner')}: {owner}
@@ -591,6 +599,13 @@ export default function MarketplaceView({ className }: MarketplaceViewProps) {
               <Badge variant="secondary" className="text-xs">
                 {dataset.contract_name}
               </Badge>
+            )}
+            {dataset.id && (
+              <RatingBadge
+                entityType="dataset"
+                entityId={dataset.id}
+                size="sm"
+              />
             )}
           </div>
           {dataset.owner_team_name && (

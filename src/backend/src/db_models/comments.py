@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Text, Enum, Index
+from sqlalchemy import Column, String, Text, Enum, Index, Integer
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.sql import func
 from sqlalchemy import TIMESTAMP
@@ -13,6 +13,11 @@ class CommentStatus(enum.Enum):
     DELETED = "deleted"
 
 
+class CommentType(enum.Enum):
+    COMMENT = "comment"
+    RATING = "rating"
+
+
 class CommentDb(Base):
     __tablename__ = "comments"
 
@@ -24,6 +29,11 @@ class CommentDb(Base):
     comment = Column(Text, nullable=False)
     audience = Column(Text, nullable=True)  # JSON array of group names who can see the comment
     status = Column(Enum(CommentStatus), nullable=False, default=CommentStatus.ACTIVE)
+    
+    # Comment type: regular comment or rating
+    comment_type = Column(Enum(CommentType), nullable=False, default=CommentType.COMMENT)
+    # Star rating (1-5), only applicable when comment_type is RATING
+    rating = Column(Integer, nullable=True)
 
     # Project relationship (nullable for backward compatibility)
     project_id = Column(String, nullable=True, index=True)  # Note: Removed ForeignKey to avoid circular import
@@ -37,4 +47,6 @@ class CommentDb(Base):
         Index("ix_comments_entity", "entity_type", "entity_id"),
         Index("ix_comments_status", "status"),
         Index("ix_comments_created_at", "created_at"),
+        Index("ix_comments_comment_type", "comment_type"),
+        Index("ix_comments_entity_rating", "entity_type", "entity_id", "comment_type"),
     )

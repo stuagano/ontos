@@ -4,9 +4,9 @@ import json
 from sqlalchemy.orm import Session
 
 from src.common.logging import get_logger
-from src.models.comments import Comment, CommentCreate, CommentUpdate, CommentListResponse
+from src.models.comments import Comment, CommentCreate, CommentUpdate, CommentListResponse, CommentType, RatingAggregation
 from src.repositories.comments_repository import comments_repo, CommentsRepository
-from src.db_models.comments import CommentStatus
+from src.db_models.comments import CommentStatus, CommentType as DbCommentType
 
 logger = get_logger(__name__)
 
@@ -28,6 +28,11 @@ class CommentsManager:
 
     def _db_to_api_model(self, comment_db) -> Comment:
         """Convert database model to API model with proper audience handling."""
+        # Convert DB enum to API enum for comment_type
+        comment_type_value = CommentType.COMMENT
+        if comment_db.comment_type == DbCommentType.RATING:
+            comment_type_value = CommentType.RATING
+        
         # Create the base comment data
         comment_data = {
             "id": comment_db.id,
@@ -38,6 +43,8 @@ class CommentsManager:
             "audience": self._convert_audience_from_json(comment_db),
             "project_id": comment_db.project_id,
             "status": comment_db.status,
+            "comment_type": comment_type_value,
+            "rating": comment_db.rating,
             "created_by": comment_db.created_by,
             "updated_by": comment_db.updated_by,
             "created_at": comment_db.created_at,
@@ -254,3 +261,142 @@ class CommentsManager:
         if not db_obj:
             return False
         return self._comments_repo.can_user_modify(db_obj, user_email, is_admin)
+
+    # =========================================================================
+    # Rating-specific methods
+    # =========================================================================
+
+    def create_rating(
+        self,
+        db: Session,
+        *,
+        entity_type: str,
+        entity_id: str,
+        rating: int,
+        comment: Optional[str] = None,
+        project_id: Optional[str] = None,
+        user_email: str
+    ) -> Comment:
+        """Create a new rating entry.
+        
+        Each user can rate an entity multiple times; the latest rating
+        is considered their "current" rating for aggregation purposes.
+        
+        Args:
+            db: Database session
+            entity_type: Type of entity (data_product, dataset, etc.)
+            entity_id: ID of the entity
+            rating: Star rating 1-5
+            comment: Optional review text
+            project_id: Optional project scope
+            user_email: Email of the rating user
+            
+        Returns:
+            Created rating as Comment
+        """
+        logger.info(f"Creating rating for {entity_type}:{entity_id} by {user_email}, rating={rating}")
+        
+        # Create as CommentCreate with rating-specific fields
+        data = CommentCreate(
+            entity_type=entity_type,
+            entity_id=entity_id,
+            comment=comment or f"{rating} star rating",
+            comment_type=CommentType.RATING,
+            rating=rating,
+            project_id=project_id
+        )
+        
+        db_obj = self._comments_repo.create_with_audience(
+            db, obj_in=data, created_by=user_email
+        )
+        db.commit()
+        db.refresh(db_obj)
+        
+        return self._db_to_api_model(db_obj)
+
+    def get_rating_aggregation(
+        self,
+        db: Session,
+        *,
+        entity_type: str,
+        entity_id: str,
+        user_email: Optional[str] = None
+    ) -> RatingAggregation:
+        """Get aggregated rating statistics for an entity.
+        
+        Args:
+            db: Database session
+            entity_type: Type of entity
+            entity_id: ID of the entity
+            user_email: Optional user email to include their current rating
+            
+        Returns:
+            RatingAggregation with average, total, distribution, and user's current rating
+        """
+        logger.debug(f"Getting rating aggregation for {entity_type}:{entity_id}")
+        
+        # Get all active ratings for this entity
+        ratings = self._comments_repo.list_ratings_for_entity(
+            db, entity_type=entity_type, entity_id=entity_id
+        )
+        
+        # Calculate aggregations
+        distribution = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        user_ratings = []
+        
+        for r in ratings:
+            if r.rating:
+                distribution[r.rating] = distribution.get(r.rating, 0) + 1
+                if user_email and r.created_by == user_email:
+                    user_ratings.append(r)
+        
+        total = sum(distribution.values())
+        avg = sum(k * v for k, v in distribution.items()) / total if total > 0 else 0.0
+        
+        # Get user's current (latest) rating
+        user_current = None
+        if user_ratings:
+            # Already sorted by created_at desc from repository
+            user_current = user_ratings[0].rating
+        
+        return RatingAggregation(
+            entity_type=entity_type,
+            entity_id=entity_id,
+            average_rating=round(avg, 2),
+            total_ratings=total,
+            distribution=distribution,
+            user_current_rating=user_current
+        )
+
+    def list_ratings(
+        self,
+        db: Session,
+        *,
+        entity_type: str,
+        entity_id: str,
+        user_email: Optional[str] = None
+    ) -> CommentListResponse:
+        """List rating entries for an entity.
+        
+        Args:
+            db: Database session
+            entity_type: Type of entity
+            entity_id: ID of the entity
+            user_email: Optional filter to only show this user's ratings
+            
+        Returns:
+            CommentListResponse containing rating entries
+        """
+        logger.debug(f"Listing ratings for {entity_type}:{entity_id}, user_filter={user_email}")
+        
+        ratings = self._comments_repo.list_ratings_for_entity(
+            db, entity_type=entity_type, entity_id=entity_id, user_email=user_email
+        )
+        
+        api_ratings = [self._db_to_api_model(r) for r in ratings]
+        
+        return CommentListResponse(
+            comments=api_ratings,
+            total_count=len(api_ratings),
+            visible_count=len(api_ratings)
+        )

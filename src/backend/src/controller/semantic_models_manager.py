@@ -1350,6 +1350,10 @@ class SemanticModelsManager:
                         source_context = context_name.replace("urn:schema:", "")
                     elif context_name.startswith("urn:glossary:"):
                         source_context = context_name.replace("urn:glossary:", "")
+                    elif context_name.startswith("urn:demo"):
+                        source_context = "Demo Data"
+                    elif context_name.startswith("urn:app-entities"):
+                        source_context = "Application Entities"
 
                     concepts.append(OntologyConcept(
                         iri=concept_iri,
@@ -1462,6 +1466,10 @@ class SemanticModelsManager:
                 source_context = context_name.replace("urn:schema:", "")
             elif context_name.startswith("urn:glossary:"):
                 source_context = context_name.replace("urn:glossary:", "")
+            elif context_name.startswith("urn:demo"):
+                source_context = "Demo Data"
+            elif context_name.startswith("urn:app-entities"):
+                source_context = "Application Entities"
             
             concept = OntologyConcept(
                 iri=concept_iri,

@@ -62,6 +62,7 @@ import { RelativeDate } from '@/components/common/relative-date';
 import DatasetFormDialog from '@/components/datasets/dataset-form-dialog';
 import DatasetInstanceFormDialog from '@/components/datasets/dataset-instance-form-dialog';
 import EntityMetadataPanel from '@/components/metadata/entity-metadata-panel';
+import { RatingPanel } from '@/components/ratings';
 import TagChip from '@/components/ui/tag-chip';
 import { CommentSidebar } from '@/components/comments';
 import ConceptSelectDialog from '@/components/semantic/concept-select-dialog';
@@ -921,6 +922,17 @@ export default function DatasetDetails() {
       {/* Metadata Panel - Rich texts, links, documents */}
       {datasetId && (
         <EntityMetadataPanel entityId={datasetId} entityType="dataset" />
+      )}
+
+      {/* Ratings Panel */}
+      {datasetId && (
+        <RatingPanel
+          entityType="dataset"
+          entityId={datasetId}
+          title={t('details.ratings.title', 'Ratings & Reviews')}
+          showDistribution
+          allowSubmit
+        />
       )}
 
       {/* Edit Dialog */}

@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 
 from src.common.repository import CRUDBase
-from src.db_models.comments import CommentDb, CommentStatus
-from src.models.comments import CommentCreate, CommentUpdate
+from src.db_models.comments import CommentDb, CommentStatus, CommentType as DbCommentType
+from src.models.comments import CommentCreate, CommentUpdate, CommentType as ApiCommentType
 
 
 class CommentsRepository(CRUDBase[CommentDb, CommentCreate, CommentUpdate]):
@@ -96,10 +96,17 @@ class CommentsRepository(CRUDBase[CommentDb, CommentCreate, CommentUpdate]):
         # Convert audience list to JSON string if provided
         audience_json = json.dumps(obj_in.audience) if obj_in.audience else None
         
-        # Create the comment dict without the audience field initially
-        comment_data = obj_in.model_dump(exclude={"audience"})
+        # Create the comment dict without the audience and comment_type fields
+        # (we need to convert comment_type from Pydantic enum to DB enum)
+        comment_data = obj_in.model_dump(exclude={"audience", "comment_type"})
         comment_data["created_by"] = created_by
         comment_data["audience"] = audience_json
+        
+        # Convert Pydantic CommentType enum to DB CommentType enum
+        if obj_in.comment_type == ApiCommentType.RATING:
+            comment_data["comment_type"] = DbCommentType.RATING
+        else:
+            comment_data["comment_type"] = DbCommentType.COMMENT
         
         db_obj = CommentDb(**comment_data)
         
@@ -160,6 +167,37 @@ class CommentsRepository(CRUDBase[CommentDb, CommentCreate, CommentUpdate]):
     def can_user_modify(self, comment: CommentDb, user_email: str, is_admin: bool = False) -> bool:
         """Check if a user can modify (edit/delete) a comment."""
         return is_admin or comment.created_by == user_email
+
+    def list_ratings_for_entity(
+        self,
+        db: Session,
+        *,
+        entity_type: str,
+        entity_id: str,
+        user_email: Optional[str] = None
+    ) -> List[CommentDb]:
+        """Get all rating-type comments for an entity.
+        
+        Args:
+            db: Database session
+            entity_type: Type of entity (data_product, dataset, etc.)
+            entity_id: ID of the entity
+            user_email: Optional filter by specific user's ratings
+            
+        Returns:
+            List of rating entries ordered by created_at desc
+        """
+        query = db.query(CommentDb).filter(
+            CommentDb.entity_type == entity_type,
+            CommentDb.entity_id == entity_id,
+            CommentDb.comment_type == DbCommentType.RATING,
+            CommentDb.status == CommentStatus.ACTIVE
+        )
+        
+        if user_email:
+            query = query.filter(CommentDb.created_by == user_email)
+        
+        return query.order_by(CommentDb.created_at.desc()).all()
 
 
 # Instantiate repository
