@@ -690,8 +690,8 @@ async def upload_data_products(
         # Complete success
         success = True
         response_status_code = 201
-        logger.info(f"Successfully created {len(created_products_for_response)} data products from uploaded file {safe_filename}")
-        return created_products_for_response
+        logger.info(f"Successfully created {len(created_products)} data products from uploaded file {safe_filename}")
+        return created_products
 
     except ValueError as e:
         # File parsing or format errors
