@@ -93,6 +93,8 @@
   "llm": {
     "title": "Preguntar a Ontos",
     "subtitle": "Haz preguntas sobre productos de datos, costos y análisis",
+    "rerun": "Ejecutar de nuevo",
+    "copyToInput": "Editar y reenviar",
     "disabledTitle": "Búsqueda con IA",
     "disabledSubtitle": "La búsqueda en lenguaje natural no está habilitada actualmente.",
     "disabledMessage": "La búsqueda LLM requiere configuración. Por favor contacte a su administrador para habilitar esta función.",

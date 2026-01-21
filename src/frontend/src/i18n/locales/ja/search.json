@@ -93,6 +93,8 @@
   "llm": {
     "title": "Ontosに聞く",
     "subtitle": "データ製品、コスト、分析について質問する",
+    "rerun": "再実行",
+    "copyToInput": "編集して再送信",
     "disabledTitle": "AI検索",
     "disabledSubtitle": "自然言語検索は現在有効になっていません。",
     "disabledMessage": "LLM検索には設定が必要です。この機能を有効にするには管理者にお問い合わせください。",

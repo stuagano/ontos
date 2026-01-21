@@ -93,6 +93,8 @@
   "llm": {
     "title": "Ontos fragen",
     "subtitle": "Stellen Sie Fragen zu Datenprodukten, Kosten und Analysen",
+    "rerun": "Erneut ausführen",
+    "copyToInput": "Bearbeiten & erneut senden",
     "disabledTitle": "KI-gestützte Suche",
     "disabledSubtitle": "Die natürliche Sprachsuche ist derzeit nicht aktiviert.",
     "disabledMessage": "Die LLM-Suche erfordert Konfiguration. Bitte kontaktieren Sie Ihren Administrator, um diese Funktion zu aktivieren.",

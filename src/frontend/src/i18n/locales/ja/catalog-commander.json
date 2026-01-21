@@ -59,6 +59,8 @@
     "selectItemPlaceholder": "まず項目を選択...",
     "askingAbout": "質問対象：",
     "thinking": "考え中...",
+    "rerun": "再実行",
+    "copyToInput": "編集して再送信",
     "exampleQuestions": {
       "columns": "どのカラムがありますか？",
       "owner": "誰が所有していますか？",

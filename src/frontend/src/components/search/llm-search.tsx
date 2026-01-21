@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Send, Bot, User, Loader2, AlertCircle, Trash2, MessageSquare, Plus, ChevronDown, Sparkles } from 'lucide-react';
+import { Send, Bot, User, Loader2, AlertCircle, Trash2, MessageSquare, Plus, ChevronDown, Sparkles, RefreshCw, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -78,9 +78,12 @@ async function deleteSession(sessionId: string): Promise<void> {
 
 interface MessageProps {
   message: ChatMessage;
+  onRerun?: (content: string) => void;
+  onCopyToInput?: (content: string) => void;
 }
 
-function Message({ message }: MessageProps) {
+function Message({ message, onRerun, onCopyToInput }: MessageProps) {
+  const { t } = useTranslation(['search']);
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
   
@@ -95,7 +98,7 @@ function Message({ message }: MessageProps) {
   }
 
   return (
-    <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
+    <div className={`group flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
       {/* Avatar */}
       <div className={`
         flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center
@@ -109,7 +112,7 @@ function Message({ message }: MessageProps) {
       
       {/* Message Content */}
       <div className={`
-        flex-1 max-w-[80%] rounded-lg px-4 py-3
+        flex-1 max-w-[80%] rounded-lg px-4 py-3 relative
         ${isUser 
           ? 'bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-100' 
           : 'bg-muted'
@@ -164,6 +167,30 @@ function Message({ message }: MessageProps) {
         <div className={`text-xs mt-2 opacity-60 ${isUser ? 'text-right' : ''}`}>
           {new Date(message.timestamp).toLocaleTimeString()}
         </div>
+
+        {/* Hover actions for user messages */}
+        {isUser && message.content && (
+          <div className="absolute -left-2 top-1/2 -translate-y-1/2 -translate-x-full flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              onClick={() => onCopyToInput?.(message.content || '')}
+              title={t('search:llm.copyToInput')}
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              onClick={() => onRerun?.(message.content || '')}
+              title={t('search:llm.rerun')}
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -393,6 +420,55 @@ export default function LLMSearch() {
     }
   };
 
+  // Handle re-running a previous message
+  const handleRerun = useCallback(async (content: string) => {
+    if (!content || isLoading) return;
+
+    // Show consent dialog on first use if not already consented
+    if (!hasLLMConsent(llmConfig)) {
+      setInput(content);
+      setShowConsentDialog(true);
+      return;
+    }
+
+    const userMessage: ChatMessage = {
+      id: `temp-${Date.now()}`,
+      role: 'user',
+      content,
+      timestamp: new Date().toISOString(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await sendMessage(content, currentSessionId);
+      setCurrentSessionId(response.session_id);
+      setMessages((prev) => [...prev, response.message]);
+      const updatedSessions = await fetchSessions();
+      setSessions(updatedSessions);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
+      setError(errorMessage);
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+      setMessages((prev) => prev.filter((m) => m.id !== userMessage.id));
+    } finally {
+      setIsLoading(false);
+      inputRef.current?.focus();
+    }
+  }, [isLoading, llmConfig, currentSessionId, toast]);
+
+  // Handle copying a message to the input for editing
+  const handleCopyToInput = useCallback((content: string) => {
+    setInput(content);
+    inputRef.current?.focus();
+  }, []);
+
   // Handle session selection
   const handleSelectSession = async (sessionId: string) => {
     try {
@@ -542,6 +618,8 @@ export default function LLMSearch() {
                 <Message
                   key={message.id}
                   message={message}
+                  onRerun={handleRerun}
+                  onCopyToInput={handleCopyToInput}
                 />
               ))}
               

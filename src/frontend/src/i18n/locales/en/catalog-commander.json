@@ -59,6 +59,8 @@
     "selectItemPlaceholder": "Select an item first...",
     "askingAbout": "Asking about:",
     "thinking": "Thinking...",
+    "rerun": "Run again",
+    "copyToInput": "Edit & resend",
     "exampleQuestions": {
       "columns": "What columns does this have?",
       "owner": "Who owns this?",

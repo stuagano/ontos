@@ -367,6 +367,69 @@ const CatalogCommander: React.FC = () => {
     }
   };
 
+  // Handle re-running a previous message
+  const handleAskRerun = useCallback(async (messageContent: string) => {
+    if (!messageContent || askLoading) return;
+
+    const selectedNode = getSelectedNodeDetails();
+    
+    // Build context message that includes selected item info
+    let contextualMessage = messageContent;
+    if (selectedNode) {
+      const contextPrefix = `[Context: I'm looking at a ${selectedNode.type} named "${selectedNode.name}" with full path "${selectedNode.id}". Please consider this context when answering.]\n\n`;
+      contextualMessage = contextPrefix + messageContent;
+    }
+
+    // Add user message to display (without context prefix for cleaner UI)
+    setAskMessages(prev => [...prev, {
+      role: 'user',
+      content: messageContent,
+      timestamp: new Date().toISOString()
+    }]);
+    setAskLoading(true);
+
+    try {
+      const response = await fetch('/api/llm-search/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: contextualMessage, session_id: askSessionId }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Chat request failed' }));
+        throw new Error(error.detail || 'Chat request failed');
+      }
+
+      const data = await response.json();
+      setAskSessionId(data.session_id);
+      
+      // Add assistant response
+      setAskMessages(prev => [...prev, {
+        role: 'assistant',
+        content: data.message.content || 'No response',
+        timestamp: data.message.timestamp || new Date().toISOString()
+      }]);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
+      toast({
+        title: t('errors.error'),
+        description: errorMessage,
+        variant: 'destructive',
+      });
+      // Remove the user message on error
+      setAskMessages(prev => prev.slice(0, -1));
+    } finally {
+      setAskLoading(false);
+      askInputRef.current?.focus();
+    }
+  }, [askLoading, askSessionId, toast, t]);
+
+  // Handle copying a message to the input for editing
+  const handleAskCopyToInput = useCallback((content: string) => {
+    setAskInput(content);
+    askInputRef.current?.focus();
+  }, []);
+
   const handleNewAskSession = () => {
     setAskSessionId(undefined);
     setAskMessages([]);
@@ -850,7 +913,7 @@ const CatalogCommander: React.FC = () => {
                     ) : (
                       <div className="space-y-3">
                         {askMessages.map((msg, idx) => (
-                          <div key={idx} className={`flex gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                          <div key={idx} className={`group flex gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
                             <div className={`
                               flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center
                               ${msg.role === 'user' 
@@ -864,7 +927,7 @@ const CatalogCommander: React.FC = () => {
                               }
                             </div>
                             <div className={`
-                              flex-1 max-w-[85%] rounded-lg px-3 py-2 text-sm
+                              flex-1 max-w-[85%] rounded-lg px-3 py-2 text-sm relative
                               ${msg.role === 'user' 
                                 ? 'bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-100' 
                                 : 'bg-muted'
@@ -877,6 +940,29 @@ const CatalogCommander: React.FC = () => {
                                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                     {msg.content}
                                   </ReactMarkdown>
+                                </div>
+                              )}
+                              {/* Hover actions for user messages */}
+                              {msg.role === 'user' && msg.content && (
+                                <div className="absolute -left-1 top-1/2 -translate-y-1/2 -translate-x-full flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                                    onClick={() => handleAskCopyToInput(msg.content)}
+                                    title={t('askPanel.copyToInput')}
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                                    onClick={() => handleAskRerun(msg.content)}
+                                    title={t('askPanel.rerun')}
+                                  >
+                                    <RefreshCw className="w-3 h-3" />
+                                  </Button>
                                 </div>
                               )}
                             </div>

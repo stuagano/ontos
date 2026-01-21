@@ -93,6 +93,8 @@
   "llm": {
     "title": "Ask Ontos",
     "subtitle": "Ask questions about data products, costs, and analytics",
+    "rerun": "Run again",
+    "copyToInput": "Edit & resend",
     "disabledTitle": "AI-Powered Search",
     "disabledSubtitle": "Natural language search is not currently enabled.",
     "disabledMessage": "LLM search requires configuration. Please contact your administrator to enable this feature.",

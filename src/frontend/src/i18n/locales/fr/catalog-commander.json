@@ -59,6 +59,8 @@
     "selectItemPlaceholder": "Sélectionnez d'abord un élément...",
     "askingAbout": "Question sur :",
     "thinking": "Réflexion en cours...",
+    "rerun": "Exécuter à nouveau",
+    "copyToInput": "Modifier et renvoyer",
     "exampleQuestions": {
       "columns": "Quelles colonnes a-t-il ?",
       "owner": "À qui appartient-il ?",
