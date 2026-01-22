@@ -5,6 +5,13 @@ import type { Core, ElementDefinition, LayoutOptions } from 'cytoscape';
 import type { OntologyConcept } from '@/types/ontology';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -12,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ZoomIn, ZoomOut, Maximize, RotateCcw, Expand, Group, Ungroup } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, RotateCcw, Expand, Group, Ungroup, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -30,7 +37,176 @@ const DOMAIN_COLORS = [
   '#77DD77', '#AEC6CF', '#FDFD96', '#836953', '#C23B22', '#779ECB', '#966FD6',
 ];
 
+// Threshold for switching from badges to dropdown
+const ROOT_BADGE_THRESHOLD = 10;
+
 export type LayoutType = 'circle' | 'cose' | 'grid' | 'breadthfirst' | 'concentric';
+
+// Props for the RootNodeFilter component
+interface RootNodeFilterProps {
+  rootNodes: OntologyConcept[];
+  rootColors: Map<string, string>;
+  hiddenRoots: Set<string>;
+  onToggleRoot: (iri: string) => void;
+  getRootDescendants: (rootIri: string) => Set<string>;
+}
+
+// Internal component for filtering root nodes - handles both badge and dropdown modes
+const RootNodeFilter: React.FC<RootNodeFilterProps> = ({
+  rootNodes,
+  rootColors,
+  hiddenRoots,
+  onToggleRoot,
+  getRootDescendants,
+}) => {
+  const visibleCount = rootNodes.filter(r => !hiddenRoots.has(r.iri)).length;
+  const totalCount = rootNodes.length;
+
+  // Show all roots
+  const handleShowAll = () => {
+    rootNodes.forEach(root => {
+      if (hiddenRoots.has(root.iri)) {
+        onToggleRoot(root.iri);
+      }
+    });
+  };
+
+  // Hide all roots
+  const handleHideAll = () => {
+    rootNodes.forEach(root => {
+      if (!hiddenRoots.has(root.iri)) {
+        onToggleRoot(root.iri);
+      }
+    });
+  };
+
+  // Badge mode: render clickable badge buttons (when <= threshold)
+  if (rootNodes.length <= ROOT_BADGE_THRESHOLD) {
+    return (
+      <div className="flex flex-wrap gap-2 text-xs">
+        {rootNodes.map(root => {
+          const color = rootColors.get(root.iri) || '#64748b';
+          const label = root.label || root.iri.split(/[/#]/).pop() || 'Unknown';
+          const isHidden = hiddenRoots.has(root.iri);
+          const descendants = getRootDescendants(root.iri);
+          
+          return (
+            <button
+              key={root.iri}
+              onClick={() => onToggleRoot(root.iri)}
+              className={cn(
+                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all",
+                "hover:shadow-md hover:scale-105",
+                "bg-card border-2",
+                isHidden ? "opacity-40 hover:opacity-60" : "opacity-100"
+              )}
+              style={{
+                borderColor: color,
+                backgroundColor: isHidden ? undefined : `${color}15`
+              }}
+              title={`${isHidden ? 'Show' : 'Hide'} ${label} (${descendants.size} concepts)`}
+            >
+              <div 
+                className="w-3 h-3 rounded-full flex-shrink-0"
+                style={{ backgroundColor: color }}
+              />
+              <span className={cn(
+                "font-medium text-foreground",
+                isHidden && "line-through"
+              )}>
+                {label}
+              </span>
+              <span className="text-muted-foreground">
+                ({descendants.size})
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Dropdown mode: render a popover with checkboxes (when > threshold)
+  return (
+    <div className="flex items-center gap-3 text-xs">
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="sm" className="h-8 gap-2">
+            <span className="font-medium">
+              {visibleCount} of {totalCount} sources visible
+            </span>
+            <ChevronDown className="h-4 w-4 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-80 p-0" align="start">
+          <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30">
+            <span className="text-sm font-medium">Filter Sources</span>
+            <div className="flex gap-1">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 px-2 text-xs"
+                onClick={handleShowAll}
+              >
+                Show All
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 px-2 text-xs"
+                onClick={handleHideAll}
+              >
+                Hide All
+              </Button>
+            </div>
+          </div>
+          <ScrollArea className="h-[300px]">
+            <div className="p-2 space-y-1">
+              {rootNodes.map(root => {
+                const color = rootColors.get(root.iri) || '#64748b';
+                const label = root.label || root.iri.split(/[/#]/).pop() || 'Unknown';
+                const isVisible = !hiddenRoots.has(root.iri);
+                const descendants = getRootDescendants(root.iri);
+                
+                return (
+                  <label
+                    key={root.iri}
+                    className={cn(
+                      "flex items-center gap-3 px-2 py-1.5 rounded-md cursor-pointer transition-colors",
+                      "hover:bg-muted/50",
+                      isVisible ? "opacity-100" : "opacity-60"
+                    )}
+                  >
+                    <Checkbox
+                      checked={isVisible}
+                      onCheckedChange={() => onToggleRoot(root.iri)}
+                    />
+                    <div 
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: color }}
+                    />
+                    <span className={cn(
+                      "flex-1 text-sm",
+                      !isVisible && "line-through text-muted-foreground"
+                    )}>
+                      {label}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      ({descendants.size})
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        </PopoverContent>
+      </Popover>
+      <span className="text-muted-foreground">
+        Click legend items to toggle visibility
+      </span>
+    </div>
+  );
+};
 
 interface KnowledgeGraphProps {
   concepts: OntologyConcept[];
@@ -534,46 +710,13 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
       {/* Legend with toggleable roots - shown when Group by Source is OFF */}
       {showRootBadges && (
         <div className="px-6 py-3 border-b bg-muted/30">
-          <div className="flex flex-wrap gap-2 text-xs">
-            {graphData.rootNodes.map(root => {
-              const color = graphData.rootColors.get(root.iri) || '#64748b';
-              const label = root.label || root.iri.split(/[/#]/).pop() || 'Unknown';
-              const isHidden = hiddenRoots.has(root.iri);
-              const descendants = graphData.getRootDescendants(root.iri);
-              
-              return (
-                <button
-                  key={root.iri}
-                  onClick={() => onToggleRoot(root.iri)}
-                  className={cn(
-                    "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all",
-                    "hover:shadow-md hover:scale-105",
-                    "bg-card border-2",
-                    isHidden ? "opacity-40 hover:opacity-60" : "opacity-100"
-                  )}
-                  style={{
-                    borderColor: color,
-                    backgroundColor: isHidden ? undefined : `${color}15`
-                  }}
-                  title={`${isHidden ? 'Show' : 'Hide'} ${label} (${descendants.size} concepts)`}
-                >
-                  <div 
-                    className="w-3 h-3 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: color }}
-                  />
-                  <span className={cn(
-                    "font-medium text-foreground",
-                    isHidden && "line-through"
-                  )}>
-                    {label}
-                  </span>
-                  <span className="text-muted-foreground">
-                    ({descendants.size})
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          <RootNodeFilter
+            rootNodes={graphData.rootNodes}
+            rootColors={graphData.rootColors}
+            hiddenRoots={hiddenRoots}
+            onToggleRoot={onToggleRoot}
+            getRootDescendants={graphData.getRootDescendants}
+          />
         </div>
       )}
 
@@ -708,46 +851,13 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
           {/* Legend in modal - shown when Group by Source is OFF */}
           {showRootBadges && (
             <div className="px-6 py-3 border-b bg-muted/30 flex-shrink-0">
-              <div className="flex flex-wrap gap-2 text-xs">
-                {graphData.rootNodes.map(root => {
-                  const color = graphData.rootColors.get(root.iri) || '#64748b';
-                  const label = root.label || root.iri.split(/[/#]/).pop() || 'Unknown';
-                  const isHidden = hiddenRoots.has(root.iri);
-                  const descendants = graphData.getRootDescendants(root.iri);
-                  
-                  return (
-                    <button
-                      key={root.iri}
-                      onClick={() => onToggleRoot(root.iri)}
-                      className={cn(
-                        "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all",
-                        "hover:shadow-md hover:scale-105",
-                        "bg-card border-2",
-                        isHidden ? "opacity-40 hover:opacity-60" : "opacity-100"
-                      )}
-                      style={{
-                        borderColor: color,
-                        backgroundColor: isHidden ? undefined : `${color}15`
-                      }}
-                      title={`${isHidden ? 'Show' : 'Hide'} ${label} (${descendants.size} concepts)`}
-                    >
-                      <div 
-                        className="w-3 h-3 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: color }}
-                      />
-                      <span className={cn(
-                        "font-medium text-foreground",
-                        isHidden && "line-through"
-                      )}>
-                        {label}
-                      </span>
-                      <span className="text-muted-foreground">
-                        ({descendants.size})
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+              <RootNodeFilter
+                rootNodes={graphData.rootNodes}
+                rootColors={graphData.rootColors}
+                hiddenRoots={hiddenRoots}
+                onToggleRoot={onToggleRoot}
+                getRootDescendants={graphData.getRootDescendants}
+              />
             </div>
           )}
 
