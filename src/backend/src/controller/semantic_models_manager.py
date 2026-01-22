@@ -41,6 +41,34 @@ from src.common.sparql_validator import SPARQLQueryValidator
 logger = get_logger(__name__)
 
 
+def _sanitize_context_name(name: str) -> str:
+    """Sanitize a name for use in URN context identifiers.
+    
+    Replaces special characters that are problematic in URNs with safe alternatives.
+    Preserves human readability while ensuring valid URN syntax.
+    
+    Args:
+        name: The original name (e.g., filename like "my_ontology.ttl")
+    
+    Returns:
+        Sanitized name safe for use in URN (e.g., "my_ontology.ttl")
+    """
+    import re
+    # Replace spaces with underscores
+    sanitized = name.replace(' ', '_')
+    # Remove or replace characters that are problematic in URNs
+    # Keep alphanumeric, underscores, hyphens, and dots
+    sanitized = re.sub(r'[^a-zA-Z0-9_.\-]', '_', sanitized)
+    # Collapse multiple underscores
+    sanitized = re.sub(r'_+', '_', sanitized)
+    # Remove leading/trailing underscores
+    sanitized = sanitized.strip('_')
+    # Ensure we have a valid name (fallback if empty)
+    if not sanitized:
+        sanitized = "unnamed"
+    return sanitized
+
+
 @contextmanager
 def timeout(seconds: int):
     """Context manager for query timeout using signals.
@@ -111,7 +139,9 @@ class SemanticModelsManager:
         # Import triples to rdf_triples table if content is provided
         if db_obj.content_text:
             try:
-                context_name = f"urn:semantic-model:{db_obj.id}"
+                # Use sanitized name for human-readable context identifiers
+                sanitized_name = _sanitize_context_name(db_obj.name)
+                context_name = f"urn:semantic-model:{sanitized_name}"
                 temp_graph = Graph()
                 fmt = 'turtle' if db_obj.format == 'skos' else 'xml'
                 temp_graph.parse(data=db_obj.content_text, format=fmt)
@@ -119,7 +149,7 @@ class SemanticModelsManager:
                     graph=temp_graph,
                     context_name=context_name,
                     source_type='upload',
-                    source_identifier=db_obj.id,
+                    source_identifier=db_obj.name,
                     created_by=created_by,
                 )
             except Exception as e:
@@ -159,7 +189,9 @@ class SemanticModelsManager:
         self._db.refresh(db_obj)
         
         # Update rdf_triples: remove old triples, import new ones
-        context_name = f"urn:semantic-model:{db_obj.id}"
+        # Use sanitized name for human-readable context identifiers
+        sanitized_name = _sanitize_context_name(db_obj.name)
+        context_name = f"urn:semantic-model:{sanitized_name}"
         try:
             # Remove existing triples for this model
             rdf_triples_repo.remove_by_context(self._db, context_name)
@@ -172,7 +204,7 @@ class SemanticModelsManager:
                 graph=temp_graph,
                 context_name=context_name,
                 source_type='upload',
-                source_identifier=db_obj.id,
+                source_identifier=db_obj.name,
                 created_by=updated_by,
             )
         except Exception as e:
@@ -198,13 +230,15 @@ class SemanticModelsManager:
                 logger.warning(f"Failed to delete physical file for model {model_id}: {e}")
         
         # Delete triples from rdf_triples table
-        context_name = f"urn:semantic-model:{model_id}"
+        # Use sanitized name for human-readable context identifiers (consistent with create/replace)
+        sanitized_name = _sanitize_context_name(model.name)
+        context_name = f"urn:semantic-model:{sanitized_name}"
         try:
             deleted_count = rdf_triples_repo.remove_by_context(self._db, context_name)
             if deleted_count > 0:
-                logger.info(f"Deleted {deleted_count} triples for semantic model {model_id}")
+                logger.info(f"Deleted {deleted_count} triples for semantic model '{model.name}' (context: {context_name})")
         except Exception as e:
-            logger.warning(f"Failed to delete triples for semantic model {model_id}: {e}")
+            logger.warning(f"Failed to delete triples for semantic model '{model.name}': {e}")
         
         # Delete from database
         obj = semantic_models_repo.remove(self._db, id=model_id)
@@ -468,7 +502,9 @@ class SemanticModelsManager:
             if not it.enabled:
                 continue
             try:
-                context_name = f"urn:semantic-model:{it.name}"
+                # Use sanitized name for human-readable context identifiers
+                sanitized_name = _sanitize_context_name(it.name)
+                context_name = f"urn:semantic-model:{sanitized_name}"
                 context = self._graph.get_context(context_name)
                 self._parse_into_graph_context(it.content_text or "", it.format, context)
                 logger.debug(f"Loaded semantic model '{it.name}' into context '{context_name}'")
