@@ -19,7 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useProjectContext } from '@/stores/project-store';
 import { Loader2, Info } from 'lucide-react';
@@ -318,30 +317,19 @@ export default function DatasetFormDialog({
             </div>
           </div>
 
-          {/* Version & Publication */}
+          {/* Version */}
           <div className="space-y-4">
             <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
-              Version & Publication
+              Version
             </h3>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="version">Version</Label>
-                <Input
-                  id="version"
-                  placeholder="e.g., 1.0.0"
-                  {...register('version')}
-                />
-              </div>
-
-              <div className="flex items-center space-x-2 pt-7">
-                <Switch
-                  id="published"
-                  checked={watch('published')}
-                  onCheckedChange={(v) => setValue('published', v)}
-                />
-                <Label htmlFor="published">Published to marketplace</Label>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="version">Version</Label>
+              <Input
+                id="version"
+                placeholder="e.g., 1.0.0"
+                {...register('version')}
+              />
             </div>
           </div>
 
