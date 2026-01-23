@@ -217,6 +217,63 @@
     "production": "Production",
     "testing": "Testing",
     "sandbox": "Sandbox"
+  },
+  "request": {
+    "button": "Request...",
+    "title": "Request Action",
+    "description": "Select the type of request for this dataset",
+    "types": {
+      "status_change": {
+        "title": "Change Status",
+        "description": "Request approval to change the lifecycle status of this dataset"
+      },
+      "review": {
+        "title": "Request Steward Review",
+        "description": "Submit this dataset for review by a data steward"
+      },
+      "publish": {
+        "title": "Publish to Marketplace",
+        "description": "Publish this dataset to the organization-wide marketplace"
+      },
+      "unpublish": {
+        "title": "Unpublish from Marketplace",
+        "description": "Remove this dataset from the organization-wide marketplace"
+      },
+      "access": {
+        "title": "Request Access",
+        "description": "Request permission to view and use this dataset"
+      }
+    },
+    "justification": "Justification",
+    "justificationPlaceholder": "Explain why this status change is needed and any relevant context...",
+    "justificationHint": "Minimum 20 characters required. This will be reviewed by an admin.",
+    "message": "Message",
+    "messagePlaceholder": "Add any notes for the reviewer...",
+    "accessMessage": "Reason for Access",
+    "accessMessagePlaceholder": "Explain why you need access to this dataset...",
+    "targetStatus": "Target Status",
+    "selectTargetStatus": "Select target status",
+    "noTransitions": "No status transitions available from current status",
+    "submit": "Send Request",
+    "submitting": "Sending...",
+    "changeStatus": "Change Status",
+    "changingStatus": "Changing Status...",
+    "cancel": "Cancel",
+    "success": {
+      "published": "Dataset published to marketplace",
+      "unpublished": "Dataset removed from marketplace",
+      "statusChanged": "Dataset status changed successfully",
+      "requestSubmitted": "Your request has been submitted and you will be notified of the decision"
+    },
+    "error": {
+      "noTargetStatus": "Please select a target status",
+      "noJustification": "Please provide a justification for the status change",
+      "shortJustification": "Please provide a more detailed justification (at least 20 characters)",
+      "noAccessReason": "Please provide a reason for requesting access",
+      "shortAccessReason": "Please provide a more detailed reason (at least 10 characters)",
+      "invalidRequest": "Cannot request this action for a dataset with the current status",
+      "submitFailed": "Failed to submit request"
+    }
   }
 }
 

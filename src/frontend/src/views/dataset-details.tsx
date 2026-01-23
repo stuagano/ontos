@@ -27,9 +27,8 @@ import {
   Bell,
   BellOff,
   ExternalLink,
-  Rocket,
-  XCircle,
   Loader2,
+  KeyRound,
 } from 'lucide-react';
 import {
   Tooltip,
@@ -72,6 +71,9 @@ import LinkedConceptChips from '@/components/semantic/linked-concept-chips';
 import type { EntitySemanticLink } from '@/types/semantic-link';
 import { Label } from '@/components/ui/label';
 import { Plus, Server, Database } from 'lucide-react';
+import RequestDatasetActionDialog from '@/components/datasets/request-dataset-action-dialog';
+import { usePermissions } from '@/stores/permissions-store';
+import { FeatureAccessLevel } from '@/types/settings';
 
 export default function DatasetDetails() {
   const { t } = useTranslation(['datasets', 'common']);
@@ -91,8 +93,17 @@ export default function DatasetDetails() {
   const [subscribers, setSubscribers] = useState<DatasetSubscribersListResponse | null>(null);
   const [subscribing, setSubscribing] = useState(false);
 
-  // Publishing state
-  const [publishing, setPublishing] = useState(false);
+  // Request dialog state
+  const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
+  
+  // Permissions
+  const { getPermissionLevel } = usePermissions();
+  const canDirectStatusChange = (() => {
+    const permLevel = getPermissionLevel('datasets');
+    return permLevel === FeatureAccessLevel.READ_WRITE ||
+           permLevel === FeatureAccessLevel.ADMIN ||
+           permLevel === FeatureAccessLevel.FULL;
+  })();
 
   // Dialog state
   const [openEditDialog, setOpenEditDialog] = useState(false);
@@ -275,68 +286,6 @@ export default function DatasetDetails() {
         description: t('details.deleteError'),
         variant: 'destructive',
       });
-    }
-  };
-
-  // Publish dataset to marketplace
-  const handlePublish = async () => {
-    if (!datasetId) return;
-    
-    setPublishing(true);
-    try {
-      const response = await fetch(`/api/datasets/${datasetId}/publish`, {
-        method: 'POST',
-      });
-      
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || t('details.publish.error'));
-      }
-      
-      toast({
-        title: t('messages.success'),
-        description: t('details.publish.success'),
-      });
-      fetchDataset();
-    } catch (err) {
-      toast({
-        title: t('messages.error'),
-        description: err instanceof Error ? err.message : t('details.publish.error'),
-        variant: 'destructive',
-      });
-    } finally {
-      setPublishing(false);
-    }
-  };
-
-  // Unpublish dataset from marketplace
-  const handleUnpublish = async () => {
-    if (!datasetId) return;
-    
-    setPublishing(true);
-    try {
-      const response = await fetch(`/api/datasets/${datasetId}/unpublish`, {
-        method: 'POST',
-      });
-      
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || t('details.publish.unpublishError'));
-      }
-      
-      toast({
-        title: t('messages.success'),
-        description: t('details.publish.unpublishSuccess'),
-      });
-      fetchDataset();
-    } catch (err) {
-      toast({
-        title: t('messages.error'),
-        description: err instanceof Error ? err.message : t('details.publish.unpublishError'),
-        variant: 'destructive',
-      });
-    } finally {
-      setPublishing(false);
     }
   };
 
@@ -635,27 +584,11 @@ export default function DatasetDetails() {
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          {/* Publish/Unpublish buttons */}
-          {!dataset.published && ['active', 'approved', 'certified'].includes(dataset.status) && (
-            <Button onClick={handlePublish} disabled={publishing}>
-              {publishing ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Rocket className="h-4 w-4 mr-2" />
-              )}
-              {t('details.publishToMarketplace')}
-            </Button>
-          )}
-          {dataset.published && (
-            <Button variant="outline" onClick={handleUnpublish} disabled={publishing}>
-              {publishing ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <XCircle className="h-4 w-4 mr-2" />
-              )}
-              {t('details.unpublish')}
-            </Button>
-          )}
+          {/* Request Action Button */}
+          <Button variant="outline" size="sm" onClick={() => setIsRequestDialogOpen(true)}>
+            <KeyRound className="mr-2 h-4 w-4" />
+            {t('request.button', 'Request...')}
+          </Button>
           <Button variant="outline" onClick={() => setOpenEditDialog(true)}>
             <Pencil className="h-4 w-4 mr-2" />
             {t('details.edit')}
@@ -1179,6 +1112,23 @@ export default function DatasetDetails() {
             setIsCreateContractDialogOpen(false);
             // Navigate to the new contract
             navigate(`/data-contracts/${contractId}`);
+          }}
+        />
+      )}
+
+      {/* Request Action Dialog */}
+      {datasetId && dataset && (
+        <RequestDatasetActionDialog
+          isOpen={isRequestDialogOpen}
+          onOpenChange={setIsRequestDialogOpen}
+          datasetId={datasetId}
+          datasetName={dataset.name}
+          datasetStatus={dataset.status}
+          datasetPublished={dataset.published}
+          canDirectStatusChange={canDirectStatusChange}
+          onSuccess={() => {
+            fetchDataset();
+            setIsRequestDialogOpen(false);
           }}
         />
       )}

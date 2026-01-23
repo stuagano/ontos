@@ -414,6 +414,213 @@ class DatasetsManager(SearchableAsset):
             raise
 
     # =========================================================================
+    # Status Change & Review Operations
+    # =========================================================================
+
+    # Allowed status transitions for datasets (simpler than ODPS/ODCS)
+    ALLOWED_TRANSITIONS = {
+        'draft': ['active', 'deprecated'],
+        'active': ['deprecated'],
+        'deprecated': ['retired', 'active'],  # active = reactivate
+        'retired': [],  # Terminal state
+    }
+
+    def change_status(
+        self,
+        dataset_id: str,
+        new_status: str,
+        changed_by: Optional[str] = None,
+    ) -> Optional[Dataset]:
+        """
+        Directly change the status of a dataset.
+        
+        This is for users with READ_WRITE permission who can change status
+        without requiring approval.
+        
+        Args:
+            dataset_id: ID of the dataset
+            new_status: Target status
+            changed_by: Username for audit trail
+            
+        Returns:
+            Updated dataset
+            
+        Raises:
+            ValueError: If transition is not allowed
+        """
+        try:
+            db_dataset = dataset_repo.get(db=self._db, id=dataset_id)
+            if not db_dataset:
+                raise ValueError(f"Dataset {dataset_id} not found")
+            
+            current_status = (db_dataset.status or 'draft').lower()
+            target_status = new_status.lower()
+            
+            # Validate transition
+            allowed = self.ALLOWED_TRANSITIONS.get(current_status, [])
+            if target_status not in allowed:
+                raise ValueError(
+                    f"Cannot change status from '{current_status}' to '{target_status}'. "
+                    f"Allowed transitions: {allowed or 'none (terminal state)'}"
+                )
+            
+            # Apply the status change
+            db_dataset.status = target_status
+            db_dataset.updated_by = changed_by
+            
+            self._db.flush()
+            self._db.refresh(db_dataset)
+            
+            logger.info(f"Changed dataset {dataset_id} status from '{current_status}' to '{target_status}' by {changed_by}")
+            return self._to_api_model(db_dataset)
+            
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"Error changing status of dataset {dataset_id}: {e}", exc_info=True)
+            self._db.rollback()
+            raise
+
+    def request_status_change(
+        self,
+        dataset_id: str,
+        target_status: str,
+        justification: str,
+        requested_by: str,
+    ) -> Dict[str, Any]:
+        """
+        Request approval for a status change.
+        
+        Creates an approval request that will be reviewed by administrators.
+        This is for users who don't have direct status change permission.
+        
+        Args:
+            dataset_id: ID of the dataset
+            target_status: Desired status
+            justification: Reason for the change
+            requested_by: Username of requester
+            
+        Returns:
+            Request metadata including request_id
+            
+        Raises:
+            ValueError: If dataset not found or transition not valid
+        """
+        try:
+            db_dataset = dataset_repo.get(db=self._db, id=dataset_id)
+            if not db_dataset:
+                raise ValueError(f"Dataset {dataset_id} not found")
+            
+            current_status = (db_dataset.status or 'draft').lower()
+            target = target_status.lower()
+            
+            # Validate the transition is valid (even if requesting approval)
+            allowed = self.ALLOWED_TRANSITIONS.get(current_status, [])
+            if target not in allowed:
+                raise ValueError(
+                    f"Cannot request status change from '{current_status}' to '{target}'. "
+                    f"Allowed transitions: {allowed or 'none (terminal state)'}"
+                )
+            
+            # For now, we'll create a simple request record
+            # In a full implementation, this would integrate with an approval workflow system
+            # or create a notification for admins
+            
+            request_id = str(uuid4())
+            
+            logger.info(
+                f"Status change request created for dataset {dataset_id}: "
+                f"'{current_status}' -> '{target}' by {requested_by}. "
+                f"Request ID: {request_id}, Justification: {justification[:100]}..."
+            )
+            
+            # TODO: In a full implementation:
+            # 1. Store the request in a status_change_requests table
+            # 2. Notify administrators via the notification system
+            # 3. Create an audit log entry
+            
+            return {
+                "request_id": request_id,
+                "dataset_id": dataset_id,
+                "current_status": current_status,
+                "target_status": target,
+                "requested_by": requested_by,
+                "justification": justification,
+                "status": "pending",
+            }
+            
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"Error requesting status change for dataset {dataset_id}: {e}", exc_info=True)
+            raise
+
+    def request_review(
+        self,
+        dataset_id: str,
+        requested_by: str,
+        message: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Request a data steward review for a dataset.
+        
+        This is typically used for draft datasets that are ready for review.
+        A data steward will be notified and can approve or request changes.
+        
+        Args:
+            dataset_id: ID of the dataset
+            requested_by: Username of requester
+            message: Optional message for the reviewer
+            
+        Returns:
+            Request metadata including request_id
+            
+        Raises:
+            ValueError: If dataset not found or not in draft status
+        """
+        try:
+            db_dataset = dataset_repo.get(db=self._db, id=dataset_id)
+            if not db_dataset:
+                raise ValueError(f"Dataset {dataset_id} not found")
+            
+            current_status = (db_dataset.status or 'draft').lower()
+            
+            # Only draft datasets can request review
+            if current_status != 'draft':
+                raise ValueError(
+                    f"Cannot request review for dataset in status '{current_status}'. "
+                    f"Only datasets in 'draft' status can request steward review."
+                )
+            
+            request_id = str(uuid4())
+            
+            logger.info(
+                f"Steward review requested for dataset {dataset_id} by {requested_by}. "
+                f"Request ID: {request_id}, Message: {(message or '')[:100]}"
+            )
+            
+            # TODO: In a full implementation:
+            # 1. Store the review request in a review_requests table
+            # 2. Find assigned data stewards and notify them
+            # 3. Create an audit log entry
+            # 4. Potentially move status to 'pending_review' or similar
+            
+            return {
+                "request_id": request_id,
+                "dataset_id": dataset_id,
+                "current_status": current_status,
+                "requested_by": requested_by,
+                "message": message,
+                "status": "review_requested",
+            }
+            
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"Error requesting review for dataset {dataset_id}: {e}", exc_info=True)
+            raise
+
+    # =========================================================================
     # Contract Operations
     # =========================================================================
 

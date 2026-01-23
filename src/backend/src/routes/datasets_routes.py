@@ -407,6 +407,153 @@ async def unpublish_dataset(
 
 
 # =============================================================================
+# Status Change & Review Endpoints
+# =============================================================================
+
+@router.post("/datasets/{dataset_id}/change-status")
+async def change_dataset_status(
+    request: Request,
+    dataset_id: str,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+    _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_WRITE)),
+    new_status: str = Body(..., embed=True),
+):
+    """
+    Directly change the status of a dataset (for users with permission).
+    
+    This endpoint performs immediate status changes without requiring approval.
+    Allowed transitions:
+    - draft -> active, deprecated
+    - active -> deprecated
+    - deprecated -> retired, active (reactivate)
+    - retired -> (terminal, no further transitions)
+    """
+    logger.info(f"Change status of dataset {dataset_id} to '{new_status}' by user {current_user.username}")
+    
+    manager = get_datasets_manager(request)
+    
+    try:
+        dataset = manager.change_status(
+            dataset_id=dataset_id,
+            new_status=new_status,
+            changed_by=current_user.username,
+        )
+        
+        if not dataset:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Dataset {dataset_id} not found",
+            )
+        
+        return {"status": dataset.status, "message": f"Status changed to {new_status}"}
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error changing status of dataset {dataset_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to change dataset status",
+        )
+
+
+@router.post("/datasets/{dataset_id}/request-status-change")
+async def request_status_change(
+    request: Request,
+    dataset_id: str,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+    _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_ONLY)),
+    target_status: str = Body(...),
+    justification: str = Body(...),
+    current_status: Optional[str] = Body(None),
+):
+    """
+    Request approval for a status change (for users without direct change permission).
+    
+    Creates an approval request that will be reviewed by administrators.
+    The user will be notified when the request is approved or rejected.
+    """
+    logger.info(f"Request status change for dataset {dataset_id} to '{target_status}' by user {current_user.username}")
+    
+    manager = get_datasets_manager(request)
+    
+    try:
+        result = manager.request_status_change(
+            dataset_id=dataset_id,
+            target_status=target_status,
+            justification=justification,
+            requested_by=current_user.username,
+        )
+        
+        return {
+            "status": "pending",
+            "message": "Status change request submitted for approval",
+            "request_id": result.get("request_id") if result else None,
+        }
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Error requesting status change for dataset {dataset_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to submit status change request",
+        )
+
+
+@router.post("/datasets/{dataset_id}/request-review")
+async def request_steward_review(
+    request: Request,
+    dataset_id: str,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+    _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_ONLY)),
+    message: Optional[str] = Body(None, embed=True),
+):
+    """
+    Request a data steward review for a dataset.
+    
+    This is typically used for draft datasets that are ready for review.
+    A data steward will be notified and can approve or request changes.
+    """
+    logger.info(f"Request steward review for dataset {dataset_id} by user {current_user.username}")
+    
+    manager = get_datasets_manager(request)
+    
+    try:
+        result = manager.request_review(
+            dataset_id=dataset_id,
+            requested_by=current_user.username,
+            message=message,
+        )
+        
+        return {
+            "status": "review_requested",
+            "message": "Review request submitted to data steward",
+            "request_id": result.get("request_id") if result else None,
+        }
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Error requesting review for dataset {dataset_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to submit review request",
+        )
+
+
+# =============================================================================
 # Contract Assignment Endpoints
 # =============================================================================
 

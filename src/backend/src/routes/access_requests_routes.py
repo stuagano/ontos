@@ -25,13 +25,13 @@ router = APIRouter(prefix="/api", tags=["Access Requests"])
 
 
 class CreateAccessRequest(BaseModel):
-    entity_type: Literal["data_product", "data_contract"] = Field(...)
+    entity_type: Literal["data_product", "data_contract", "dataset"] = Field(...)
     entity_ids: List[str] = Field(..., min_length=1)
     message: Optional[str] = None
 
 
 class HandleAccessRequest(BaseModel):
-    entity_type: Literal["data_product", "data_contract"] = Field(...)
+    entity_type: Literal["data_product", "data_contract", "dataset"] = Field(...)
     entity_id: str = Field(...)
     requester_email: str = Field(...)
     decision: Literal["approve", "deny", "clarify"] = Field(...)
