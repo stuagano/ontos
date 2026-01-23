@@ -146,10 +146,8 @@ export default function MarketplaceView({ className }: MarketplaceViewProps) {
     loadSubscribedProducts();
   }, [loadSubscribedProducts]);
 
-  // Fetch published datasets (only when datasets tab is active)
+  // Fetch published datasets (load on mount to know if toggle should be shown)
   useEffect(() => {
-    if (assetType !== 'datasets') return;
-    
     const loadDatasets = async () => {
       try {
         setDatasetsLoading(true);
@@ -167,7 +165,7 @@ export default function MarketplaceView({ className }: MarketplaceViewProps) {
       }
     };
     loadDatasets();
-  }, [assetType]);
+  }, []);
 
   // Fetch subscribed datasets
   const loadSubscribedDatasets = useCallback(async () => {
@@ -379,6 +377,22 @@ export default function MarketplaceView({ className }: MarketplaceViewProps) {
     
     return filtered;
   }, [allDatasets, searchQuery]);
+
+  // Determine if we have products and/or datasets available
+  const hasProducts = allProducts.length > 0;
+  const hasDatasets = allDatasets.length > 0;
+  const showAssetToggle = hasProducts && hasDatasets;
+
+  // Auto-switch to available asset type when only one exists
+  useEffect(() => {
+    if (productsLoading || datasetsLoading) return;
+    
+    if (!hasProducts && hasDatasets && assetType === 'products') {
+      setAssetType('datasets');
+    } else if (hasProducts && !hasDatasets && assetType === 'datasets') {
+      setAssetType('products');
+    }
+  }, [hasProducts, hasDatasets, assetType, productsLoading, datasetsLoading]);
 
   // Handle product card click
   const handleProductClick = async (product: DataProduct) => {
@@ -801,30 +815,32 @@ export default function MarketplaceView({ className }: MarketplaceViewProps) {
 
           {/* Asset Type Toggle & Tiles Per Row */}
           <div className="flex items-center gap-4 flex-wrap">
-            {/* Asset Type Toggle */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">{t('marketplace.browseAssetType')}</span>
-              <div className="inline-flex items-center gap-1 p-0.5 bg-muted rounded-md">
-                <Button
-                  variant={assetType === 'products' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setAssetType('products')}
-                  className="h-7 px-3 gap-1.5"
-                >
-                  <Package className="h-3.5 w-3.5" />
-                  {t('marketplace.assetTypes.products')}
-                </Button>
-                <Button
-                  variant={assetType === 'datasets' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setAssetType('datasets')}
-                  className="h-7 px-3 gap-1.5"
-                >
-                  <Table2 className="h-3.5 w-3.5" />
-                  {t('marketplace.assetTypes.datasets')}
-                </Button>
+            {/* Asset Type Toggle - only show when both types have data */}
+            {showAssetToggle && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">{t('marketplace.browseAssetType')}</span>
+                <div className="inline-flex items-center gap-1 p-0.5 bg-muted rounded-md">
+                  <Button
+                    variant={assetType === 'products' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setAssetType('products')}
+                    className="h-7 px-3 gap-1.5"
+                  >
+                    <Package className="h-3.5 w-3.5" />
+                    {t('marketplace.assetTypes.products')}
+                  </Button>
+                  <Button
+                    variant={assetType === 'datasets' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setAssetType('datasets')}
+                    className="h-7 px-3 gap-1.5"
+                  >
+                    <Table2 className="h-3.5 w-3.5" />
+                    {t('marketplace.assetTypes.datasets')}
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Tiles Per Row Selector */}
             <div className="flex items-center gap-2">
