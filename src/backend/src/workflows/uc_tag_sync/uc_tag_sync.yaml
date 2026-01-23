@@ -37,6 +37,10 @@ tasks:
         - "{{job.parameters.postgres_port}}"
         - "--postgres_schema"
         - "{{job.parameters.postgres_schema}}"
+        - "--product_name"
+        - "{{job.parameters.product_name}}"
+        - "--product_version"
+        - "{{job.parameters.product_version}}"
     environment_key: "uc-tag-sync-env"
 
 # Schedule to run every 4 hours
@@ -59,6 +63,8 @@ parameters:
   postgres_port: "5432"
   postgres_schema: "public"
   tag_sync_configs: "[]"
+  product_name: "ontos"
+  product_version: "0.0.0"
 
 # Configurable parameters (managed via UI)
 configurable_parameters:

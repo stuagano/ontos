@@ -430,6 +430,9 @@ def main():
     parser.add_argument("--postgres_db", type=str, required=True)
     parser.add_argument("--postgres_port", type=str, default="5432")
     parser.add_argument("--postgres_schema", type=str, default="public")
+    # Telemetry parameters (passed from app)
+    parser.add_argument("--product_name", type=str, default="ontos")
+    parser.add_argument("--product_version", type=str, default="0.0.0")
     args, _ = parser.parse_known_args()
     
     contract_id = args.contract_id
@@ -449,7 +452,7 @@ def main():
     # Initialize Workspace Client (needed for OAuth authentication)
     print("\nInitializing Databricks Workspace Client...")
     try:
-        ws = WorkspaceClient()
+        ws = WorkspaceClient(product=args.product_name, product_version=args.product_version)
         print("✓ Workspace client initialized")
     except Exception as e:
         print(f"✗ Failed to initialize workspace client: {e}")

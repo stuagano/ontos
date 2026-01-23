@@ -15,6 +15,7 @@ from databricks.sdk.service.jobs import RunLifeCycleState, RunResultState
 from sqlalchemy.orm import Session
 
 from src.common.logging import get_logger
+from src import __version__
 from src.repositories.workflow_installations_repository import workflow_installation_repo
 from src.repositories.workflow_job_runs_repository import workflow_job_run_repo
 from src.repositories.workflow_configurations_repository import workflow_configuration_repo
@@ -491,6 +492,9 @@ class JobsManager:
                 'postgres_db': str(getattr(self._settings, 'PGDATABASE', '') or ''),
                 'postgres_port': str(getattr(self._settings, 'PGPORT', '5432') or '5432'),
                 'postgres_schema': str(getattr(self._settings, 'PGSCHEMA', 'public') or 'public'),
+                # Telemetry parameters for WorkspaceClient identification
+                'product_name': 'ontos',
+                'product_version': __version__,
             }
             # Only inject if workflow YAML defines these parameters
             try:

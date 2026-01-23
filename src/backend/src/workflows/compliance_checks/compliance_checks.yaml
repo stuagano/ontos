@@ -33,6 +33,10 @@ tasks:
         - "{{job.parameters.postgres_port}}"
         - "--postgres_schema"
         - "{{job.parameters.postgres_schema}}"
+        - "--product_name"
+        - "{{job.parameters.product_name}}"
+        - "--product_version"
+        - "{{job.parameters.product_version}}"
     environment_key: "compliance-checks-env"
 
 schedule:
@@ -52,6 +56,8 @@ parameters:
   postgres_db: ""
   postgres_port: "5432"
   postgres_schema: "public"
+  product_name: "ontos"
+  product_version: "0.0.0"
 
 # Configurable parameters (managed via UI)
 configurable_parameters:

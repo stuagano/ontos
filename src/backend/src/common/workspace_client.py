@@ -3,7 +3,7 @@ import os
 import signal
 import time
 from functools import cached_property, wraps
-from typing import Any, Callable, Dict, Optional, final
+from typing import Any, Callable, Dict, Optional
 
 from databricks import sql
 from databricks.sdk import WorkspaceClient
@@ -239,23 +239,14 @@ class CachingWorkspaceClient(WorkspaceClient):
              raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}' - use the property")
         return getattr(self._client, name)
 
-@staticmethod
-@final
 def _verify_workspace_client(ws: WorkspaceClient, skip_cluster_check: bool = False) -> WorkspaceClient:
     """
     Verify the Databricks WorkspaceClient configuration and connectivity.
-    Sets product info for telemetry tracking.
     
     Args:
         ws: WorkspaceClient to verify
         skip_cluster_check: If True, skip cluster API verification (useful for OBO tokens with limited scopes)
     """
-    # Using reflection to set right value for _product_info as ontos for telemetry
-    product_info = getattr(ws.config, '_product_info')
-    if product_info[0] != "ontos":
-        setattr(ws.config, '_product_info', ('ontos', __version__))
-        logger.info(f"Set workspace client product info to: ontos {__version__}")
-
     # Verify Databricks workspace is accessible
     if skip_cluster_check:
         # For OBO tokens with limited scopes, use a lighter verification
@@ -321,7 +312,9 @@ def get_workspace_client(settings: Optional[Settings] = None, timeout: int = 30)
         client = WorkspaceClient(
             host=settings.DATABRICKS_HOST,
             token=token,
-            auth_type="pat"  # Force PAT authentication, ignore OAuth env vars
+            auth_type="pat",  # Force PAT authentication, ignore OAuth env vars
+            product="ontos",
+            product_version=__version__
         )
         
         cache_identifier = token_hash
@@ -340,7 +333,11 @@ def get_workspace_client(settings: Optional[Settings] = None, timeout: int = 30)
         logger.info(f"Initializing NEW implicit auth workspace client with host: {settings.DATABRICKS_HOST}, timeout: {timeout}s")
         
         # Create client with implicit authentication (no token parameter)
-        client = WorkspaceClient(host=settings.DATABRICKS_HOST)
+        client = WorkspaceClient(
+            host=settings.DATABRICKS_HOST,
+            product="ontos",
+            product_version=__version__
+        )
         
         cache_identifier = "implicit"
 
@@ -444,7 +441,9 @@ def get_obo_workspace_client(
     try:
         client = WorkspaceClient(
             host=settings.DATABRICKS_HOST,
-            token=obo_token
+            token=obo_token,
+            product="ontos",
+            product_version=__version__
         )
     finally:
         # Restore OAuth env vars

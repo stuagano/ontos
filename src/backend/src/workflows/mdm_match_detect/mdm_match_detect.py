@@ -582,6 +582,9 @@ def main():
     parser.add_argument("--postgres_db", required=True, help="PostgreSQL database")
     parser.add_argument("--postgres_port", default="5432", help="PostgreSQL port")
     parser.add_argument("--postgres_schema", default="public", help="PostgreSQL schema")
+    # Telemetry parameters (passed from app)
+    parser.add_argument("--product_name", type=str, default="ontos")
+    parser.add_argument("--product_version", type=str, default="0.0.0")
     args, _ = parser.parse_known_args()
 
     print("=" * 80)
@@ -602,7 +605,7 @@ def main():
 
     # Initialize Workspace Client (needed for OAuth authentication)
     print("\nInitializing Databricks Workspace Client...")
-    ws_client = WorkspaceClient()
+    ws_client = WorkspaceClient(product=args.product_name, product_version=args.product_version)
     print("✓ Workspace client initialized")
 
     # Connect to app database using OAuth

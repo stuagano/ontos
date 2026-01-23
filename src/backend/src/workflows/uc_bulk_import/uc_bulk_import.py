@@ -761,6 +761,9 @@ def main():
     parser.add_argument("--postgres_db", type=str, required=True)
     parser.add_argument("--postgres_port", type=str, default="5432")
     parser.add_argument("--postgres_schema", type=str, default="public")
+    # Telemetry parameters (passed from app)
+    parser.add_argument("--product_name", type=str, default="ontos")
+    parser.add_argument("--product_version", type=str, default="0.0.0")
     
     args = parser.parse_args()
     
@@ -780,7 +783,7 @@ def main():
     
     # Initialize clients
     print("\nInitializing...")
-    ws = WorkspaceClient()
+    ws = WorkspaceClient(product=args.product_name, product_version=args.product_version)
     print("  Workspace client initialized")
     
     # Get current service principal for audit fields

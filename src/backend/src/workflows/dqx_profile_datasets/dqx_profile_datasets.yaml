@@ -29,6 +29,10 @@ tasks:
         - "{{job.parameters.postgres_port}}"
         - "--postgres_schema"
         - "{{job.parameters.postgres_schema}}"
+        - "--product_name"
+        - "{{job.parameters.product_name}}"
+        - "--product_version"
+        - "{{job.parameters.product_version}}"
     environment_key: "dqx-env"
 
 parameters:
@@ -40,6 +44,8 @@ parameters:
   postgres_db: ""
   postgres_port: "5432"
   postgres_schema: "public"
+  product_name: "ontos"
+  product_version: "0.0.0"
 
 timeout_seconds: 3600
 max_concurrent_runs: 1
