@@ -76,7 +76,7 @@ const CreateContractFromDatasetDialog: React.FC<CreateContractFromDatasetDialogP
     setLoadingDatasets(true)
     try {
       const response = await get('/api/datasets')
-      setDatasets(Array.isArray(response) ? response : [])
+      setDatasets(Array.isArray(response.data) ? response.data : [])
     } catch (e) {
       console.error('Failed to fetch datasets:', e)
       setDatasets([])
@@ -90,7 +90,7 @@ const CreateContractFromDatasetDialog: React.FC<CreateContractFromDatasetDialogP
     setLoadingInstances(true)
     try {
       const response = await get(`/api/datasets/${datasetId}/instances`)
-      setInstances(Array.isArray(response?.instances) ? response.instances : [])
+      setInstances(Array.isArray(response.data?.instances) ? response.data.instances : [])
     } catch (e) {
       console.error('Failed to fetch instances:', e)
       setInstances([])

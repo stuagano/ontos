@@ -19,6 +19,7 @@ import {
     Table2, // Icon for Datasets (matching marketplace)
     Package, // Icon for Data Products (matching marketplace)
     GitBranch, // Icon for Process Workflows
+    BookOpen, // Icon for Data Catalog
     type LucideIcon, // Import LucideIcon type
   } from 'lucide-react';
   
@@ -115,6 +116,16 @@ import {
       path: '/data-asset-reviews',
       description: 'Review and approve Databricks assets like tables, views, and functions.',
       icon: ClipboardCheck,
+      group: 'Governance',
+      maturity: 'beta',
+      showInLanding: true,
+    },
+    {
+      id: 'data-catalog',
+      name: 'Data Catalog',
+      path: '/data-catalog',
+      description: 'Browse Unity Catalog assets, search columns, and analyze lineage.',
+      icon: BookOpen,
       group: 'Governance',
       maturity: 'beta',
       showInLanding: true,

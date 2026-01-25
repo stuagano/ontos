@@ -25,6 +25,7 @@ from src.common.middleware import ErrorHandlingMiddleware, LoggingMiddleware
 from src.routes import (
     access_grants_routes,
     catalog_commander_routes,
+    data_catalog_routes,
     compliance_routes,
     comments_routes,
     data_asset_reviews_routes,
@@ -294,6 +295,7 @@ approvals_routes.register_routes(app)
 semantic_models_routes.register_routes(app)
 semantic_links_routes.register_routes(app)
 data_asset_reviews_routes.register_routes(app)
+data_catalog_routes.register_routes(app)
 
 # Operations - Monitoring and technical management
 compliance_routes.register_routes(app)

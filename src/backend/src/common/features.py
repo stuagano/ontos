@@ -108,6 +108,10 @@ APP_FEATURES: Dict[str, Dict[str, str | List[FeatureAccessLevel]]] = {
         'name': 'Data Asset Review',
         'allowed_levels': READ_WRITE_ADMIN_LEVELS # Stewards review, admins manage
     },
+    'data-catalog': {
+        'name': 'Data Catalog',
+        'allowed_levels': READ_WRITE_ADMIN_LEVELS  # Browse catalog, view lineage
+    },
     # Observability / Logs
     'audit': {
         'name': 'Audit & Change Logs',

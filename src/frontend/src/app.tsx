@@ -31,6 +31,8 @@ import Entitlements from './views/entitlements';
 import EntitlementsSync from './views/entitlements-sync';
 import DataAssetReviews from './views/data-asset-reviews';
 import DataAssetReviewDetails from './views/data-asset-review-details';
+import DataCatalog from './views/data-catalog';
+import DataCatalogDetails from './views/data-catalog-details';
 import CatalogCommander from './views/catalog-commander';
 import Settings from './views/settings';
 import About from './views/about';
@@ -114,6 +116,8 @@ export default function App() {
               <Route path="/estates/:estateId" element={<EstateDetailsView />} />
               <Route path="/data-asset-reviews" element={<DataAssetReviews />} />
               <Route path="/data-asset-reviews/:requestId" element={<DataAssetReviewDetails />} />
+              <Route path="/data-catalog" element={<DataCatalog />} />
+              <Route path="/data-catalog/*" element={<DataCatalogDetails />} />
               <Route path="/audit" element={<AuditTrail />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

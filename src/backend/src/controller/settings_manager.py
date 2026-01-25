@@ -54,6 +54,7 @@ DEFAULT_ROLE_PERMISSIONS = {
         'data-domains': FeatureAccessLevel.ADMIN,
         'data-products': FeatureAccessLevel.ADMIN,
         'data-contracts': FeatureAccessLevel.ADMIN,
+        'data-catalog': FeatureAccessLevel.ADMIN,
         'teams': FeatureAccessLevel.READ_ONLY,
         'projects': FeatureAccessLevel.READ_ONLY,
         'business-glossary': FeatureAccessLevel.ADMIN,
@@ -72,6 +73,7 @@ DEFAULT_ROLE_PERMISSIONS = {
         'data-domains': FeatureAccessLevel.READ_WRITE,
         'data-products': FeatureAccessLevel.READ_WRITE,
         'data-contracts': FeatureAccessLevel.READ_WRITE,
+        'data-catalog': FeatureAccessLevel.READ_WRITE,
         'teams': FeatureAccessLevel.READ_ONLY,
         'projects': FeatureAccessLevel.READ_ONLY,
         'business-glossary': FeatureAccessLevel.READ_WRITE,
@@ -85,6 +87,7 @@ DEFAULT_ROLE_PERMISSIONS = {
         'data-domains': FeatureAccessLevel.READ_ONLY,
         'data-products': FeatureAccessLevel.READ_ONLY,
         'data-contracts': FeatureAccessLevel.READ_ONLY,
+        'data-catalog': FeatureAccessLevel.READ_ONLY,
         'teams': FeatureAccessLevel.READ_ONLY,
         'projects': FeatureAccessLevel.READ_ONLY,
         'business-glossary': FeatureAccessLevel.READ_ONLY,
@@ -96,6 +99,7 @@ DEFAULT_ROLE_PERMISSIONS = {
         'data-domains': FeatureAccessLevel.READ_ONLY,
         'data-products': FeatureAccessLevel.READ_WRITE,
         'data-contracts': FeatureAccessLevel.READ_WRITE,
+        'data-catalog': FeatureAccessLevel.READ_ONLY,
         'teams': FeatureAccessLevel.READ_WRITE,
         'projects': FeatureAccessLevel.READ_WRITE,
         'business-glossary': FeatureAccessLevel.READ_ONLY,
@@ -1414,6 +1418,16 @@ class SettingsManager:
                 for k, v in feature_permissions_raw.items() 
                 if isinstance(v, str) # Ensure value is string before enum conversion
             }
+            
+            # For Admin role: ensure ADMIN permission for any NEW features not yet in DB
+            # This handles the case when new features are added after the Admin role was created
+            if role_db.name == "Admin":
+                all_features = get_feature_config()
+                for feat_id in all_features:
+                    if feat_id not in feature_permissions:
+                        feature_permissions[feat_id] = FeatureAccessLevel.ADMIN
+                        logger.debug(f"Auto-granting ADMIN permission for new feature '{feat_id}' to Admin role")
+                        
         except (json.JSONDecodeError, TypeError, ValueError) as e:
             logger.warning(f"Could not parse or convert feature_permissions JSON for role ID {role_db.id}: {role_db.feature_permissions}. Error: {e}")
             feature_permissions = {}
