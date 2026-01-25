@@ -113,12 +113,13 @@ async def list_executions(
         current_step_name = None
         if exe.current_step_id and workflow and workflow.steps:
             try:
-                steps = json.loads(workflow.steps) if isinstance(workflow.steps, str) else workflow.steps
-                for step in steps:
-                    if step.get('id') == exe.current_step_id:
-                        current_step_name = step.get('name', exe.current_step_id)
+                # workflow.steps is a relationship to WorkflowStepDb objects
+                # current_step_id stores the step_id (slug), not the UUID id
+                for step in workflow.steps:
+                    if step.step_id == exe.current_step_id:
+                        current_step_name = step.name or exe.current_step_id
                         break
-            except (json.JSONDecodeError, TypeError):
+            except Exception:
                 pass
         
         result.append(WorkflowExecution(
