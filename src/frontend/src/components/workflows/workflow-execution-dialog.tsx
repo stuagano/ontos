@@ -56,6 +56,11 @@ function getStepExecutionState(
     return 'current';
   }
   
+  // If workflow is running and we haven't reached this step yet
+  if (execution.status === 'running' && execution.current_step_id === stepId) {
+    return 'running';
+  }
+  
   // Check step execution results
   const stepExecution = execution.step_executions?.find(se => se.step_id === stepId);
   if (stepExecution) {
@@ -77,8 +82,8 @@ interface ExecutionStepNodeProps {
 
 function ExecutionStepNode({ data }: { data: ExecutionStepNodeProps['data'] }) {
   const { step, state } = data;
-  const Icon = getStepIcon(step.type);
-  const color = getStepColor(step.type);
+  const Icon = getStepIcon(step.step_type);
+  const color = getStepColor(step.step_type);
   
   const stateStyles: Record<StepExecutionState, string> = {
     pending: 'opacity-50',
@@ -106,7 +111,7 @@ function ExecutionStepNode({ data }: { data: ExecutionStepNodeProps['data'] }) {
         {stateIcons[state]}
       </div>
       <div className="text-xs text-muted-foreground capitalize">
-        {step.type.replace('_', ' ')}
+        {step.step_type.replace('_', ' ')}
       </div>
     </div>
   );
@@ -158,9 +163,9 @@ function SimpleWorkflowFlow({
       
       {/* Steps */}
       {workflow.steps.map((step, index) => {
-        const state = getStepExecutionState(step.id, execution);
-        const Icon = getStepIcon(step.type);
-        const color = getStepColor(step.type);
+        const state = getStepExecutionState(step.step_id, execution);
+        const Icon = getStepIcon(step.step_type);
+        const color = getStepColor(step.step_type);
         
         const stateStyles: Record<StepExecutionState, string> = {
           pending: 'opacity-50 border-muted',
@@ -181,7 +186,7 @@ function SimpleWorkflowFlow({
         };
         
         return (
-          <div key={step.id}>
+          <div key={step.step_id}>
             <div className={`flex items-center gap-3 p-3 rounded-lg border-2 ${stateStyles[state]}`}>
               <div className={`p-2 rounded-md bg-${color}-100 dark:bg-${color}-900/30`}>
                 <Icon className={`h-5 w-5 text-${color}-500`} />
@@ -189,7 +194,7 @@ function SimpleWorkflowFlow({
               <div className="flex-1 min-w-0">
                 <div className="font-medium text-sm truncate">{step.name}</div>
                 <div className="text-xs text-muted-foreground capitalize">
-                  {step.type.replace('_', ' ')}
+                  {step.step_type.replace('_', ' ')}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -226,8 +231,10 @@ export function WorkflowExecutionDialog({
     if (open && execution?.workflow_id) {
       setLoading(true);
       get<ProcessWorkflow>(`/api/workflows/${execution.workflow_id}`)
-        .then(data => {
-          setWorkflow(data);
+        .then(response => {
+          if (response.data) {
+            setWorkflow(response.data);
+          }
         })
         .catch(err => {
           console.error('Failed to fetch workflow:', err);
