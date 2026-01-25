@@ -4,4 +4,4 @@ Databricks App API package.
 This package provides a FastAPI-based API for managing Unity Catalog and related services.
 """
 
-__version__ = "0.4.6"
+__version__ = "0.5.0"
