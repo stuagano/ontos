@@ -37,11 +37,16 @@
   },
   "status": {
     "draft": "Brouillon",
+    "sandbox": "Bac à sable",
+    "proposed": "Proposé",
+    "under_review": "En révision",
+    "in_review": "En révision",
     "active": "Actif",
     "approved": "Approuvé",
     "certified": "Certifié",
     "deprecated": "Obsolète",
-    "retired": "Retiré"
+    "retired": "Retiré",
+    "published": "Publié"
   },
   "details": {
     "backToList": "Retour à la Liste",

@@ -37,11 +37,16 @@
   },
   "status": {
     "draft": "Draft",
+    "sandbox": "Sandbox",
+    "proposed": "Proposed",
+    "under_review": "Under Review",
+    "in_review": "In Review",
     "active": "Active",
     "approved": "Approved",
     "certified": "Certified",
     "deprecated": "Deprecated",
-    "retired": "Retired"
+    "retired": "Retired",
+    "published": "Published"
   },
   "details": {
     "backToList": "Back to List",

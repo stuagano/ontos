@@ -99,6 +99,10 @@
   },
   "status": {
     "draft": "Entwurf",
+    "sandbox": "Sandbox",
+    "proposed": "Vorgeschlagen",
+    "under_review": "In Prüfung",
+    "in_review": "In Prüfung",
     "active": "Aktiv",
     "approved": "Genehmigt",
     "certified": "Zertifiziert",

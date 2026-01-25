@@ -37,11 +37,16 @@
   },
   "status": {
     "draft": "下書き",
+    "sandbox": "サンドボックス",
+    "proposed": "提案中",
+    "under_review": "レビュー中",
+    "in_review": "レビュー中",
     "active": "アクティブ",
     "approved": "承認済み",
     "certified": "認定済み",
     "deprecated": "非推奨",
-    "retired": "廃止"
+    "retired": "廃止",
+    "published": "公開済み"
   },
   "details": {
     "backToList": "リストに戻る",

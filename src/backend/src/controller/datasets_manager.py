@@ -539,7 +539,8 @@ class DatasetsManager(DeliveryMixin, SearchableAsset):
 
     # Allowed status transitions for datasets (simpler than ODPS/ODCS)
     ALLOWED_TRANSITIONS = {
-        'draft': ['active', 'deprecated'],
+        'draft': ['active', 'deprecated', 'in_review'],
+        'in_review': ['draft', 'active'],  # draft = rejected/cancelled, active = approved
         'active': ['deprecated'],
         'deprecated': ['retired', 'active'],  # active = reactivate
         'retired': [],  # Terminal state

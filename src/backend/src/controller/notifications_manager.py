@@ -34,6 +34,17 @@ class NotificationsManager:
         self._repo = notification_repo # Use the repository instance
         self._settings_manager = settings_manager # Store the manager
 
+    def get_notification_by_id(self, db: Session, notification_id: str) -> Optional[Notification]:
+        """Get a single notification by ID."""
+        try:
+            db_obj = self._repo.get(db=db, id=notification_id)
+            if not db_obj:
+                return None
+            return Notification.model_validate(db_obj)
+        except Exception as e:
+            logger.error(f"Error getting notification {notification_id}: {e}", exc_info=True)
+            return None
+
     def get_notifications(self, db: Session, user_info: Optional[UserInfo] = None) -> List[Notification]:
         """Get notifications from the database, filtered for the user."""
         

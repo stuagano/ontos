@@ -30,8 +30,14 @@
   },
   "status": {
     "draft": "Draft",
+    "pending": "Pending",
+    "in_review": "In Review",
+    "under_review": "Under Review",
+    "active": "Active",
     "approved": "Approved",
-    "deprecated": "Deprecated"
+    "certified": "Certified",
+    "deprecated": "Deprecated",
+    "retired": "Retired"
   },
   "details": {
     "backToList": "Back to Terms",

@@ -99,6 +99,10 @@
   },
   "status": {
     "draft": "Brouillon",
+    "sandbox": "Bac à sable",
+    "proposed": "Proposé",
+    "under_review": "En révision",
+    "in_review": "En révision",
     "active": "Actif",
     "approved": "Approuvé",
     "certified": "Certifié",

@@ -37,11 +37,16 @@
   },
   "status": {
     "draft": "Entwurf",
+    "sandbox": "Sandbox",
+    "proposed": "Vorgeschlagen",
+    "under_review": "In Prüfung",
+    "in_review": "In Prüfung",
     "active": "Aktiv",
     "approved": "Genehmigt",
     "certified": "Zertifiziert",
     "deprecated": "Veraltet",
-    "retired": "Stillgelegt"
+    "retired": "Stillgelegt",
+    "published": "Veröffentlicht"
   },
   "details": {
     "backToList": "Zurück zur Liste",
