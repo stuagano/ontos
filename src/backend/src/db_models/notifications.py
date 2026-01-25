@@ -21,8 +21,9 @@ class NotificationDb(Base):
     updated_at = Column(DateTime(timezone=True), nullable=True)  # For tracking updates
     read = Column(Boolean, default=False, nullable=False)
     can_delete = Column(Boolean, default=True, nullable=False)
-    recipient = Column(String, nullable=True, index=True) # Email or Role name
-    target_roles = Column(String, nullable=True)  # JSON array of role names
+    recipient = Column(String, nullable=True, index=True)  # Email, username, or role name (legacy)
+    recipient_role_id = Column(String, nullable=True, index=True)  # Role UUID for role-based recipients
+    target_roles = Column(String, nullable=True)  # JSON array of role names (legacy)
     action_type = Column(String, nullable=True) # For linking to actions
     action_payload = Column(String, nullable=True) # JSON string for action context
     data = Column(String, nullable=True)  # JSON string for additional data (job progress etc.)

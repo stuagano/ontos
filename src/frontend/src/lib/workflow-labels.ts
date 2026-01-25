@@ -182,3 +182,39 @@ export const ALL_STEP_TYPES: StepType[] = [
   'delivery',
 ];
 
+/**
+ * Special recipient values that are not role UUIDs.
+ */
+export const SPECIAL_RECIPIENTS: Record<string, string> = {
+  'requester': 'Requester',
+  'owner': 'Owner',
+  'domain_owners': 'Domain Owners',
+  'project_owners': 'Project Owners',
+  'data_stewards': 'Data Stewards',
+  'admins': 'Administrators',
+};
+
+/**
+ * Resolve an approver/recipient identifier to a display name.
+ * Handles both UUIDs (resolved via roles map) and special values.
+ */
+export function resolveRecipientDisplay(
+  value: string | undefined,
+  rolesMap: Record<string, string>
+): string {
+  if (!value) return 'Not configured';
+  
+  // Check special values first
+  if (value in SPECIAL_RECIPIENTS) {
+    return SPECIAL_RECIPIENTS[value];
+  }
+  
+  // Check if it's a role UUID
+  if (value in rolesMap) {
+    return rolesMap[value];
+  }
+  
+  // Fallback: return raw value (might be email or legacy role name)
+  return value;
+}
+

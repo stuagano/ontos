@@ -12,8 +12,10 @@ export interface Notification {
   updated_at?: string | null; // For tracking updates
   read: boolean;
   can_delete: boolean;
-  recipient?: string | null;
-  target_roles?: string[] | null;  // For role-based notifications
+  recipient?: string | null;  // Email, username, or role name (legacy)
+  recipient_role_id?: string | null;  // Role UUID for role-based recipients
+  recipient_role_name?: string | null;  // Resolved role name for display
+  target_roles?: string[] | null;  // For role-based notifications (legacy)
   action_type?: string | null;
   action_payload?: Record<string, any> | null;
   data?: Record<string, any> | null;  // Additional data for job progress etc.

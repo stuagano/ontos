@@ -169,6 +169,51 @@ async def list_compliance_policies_for_workflows(
     ]
 
 
+@router.get("/roles")
+async def list_roles_for_workflows(
+    db: DBSessionDep,
+    _: bool = Depends(PermissionChecker('settings', FeatureAccessLevel.READ_ONLY)),
+) -> List[Dict[str, Any]]:
+    """List app roles for workflow designer selection.
+    
+    Returns roles with their UUIDs for use in approval/notification step configuration.
+    Using UUIDs ensures referential integrity if roles are renamed.
+    """
+    from src.db_models.settings import AppRoleDb
+    
+    roles = db.query(AppRoleDb).order_by(AppRoleDb.name).all()
+    
+    return [
+        {
+            "id": r.id,
+            "name": r.name,
+            "description": r.description,
+            "has_groups": bool(r.assigned_groups),  # Indicate if role is configured
+        }
+        for r in roles
+    ]
+
+
+@router.get("/roles/{role_id}")
+async def get_role_by_id(
+    role_id: str,
+    db: DBSessionDep,
+    _: bool = Depends(PermissionChecker('settings', FeatureAccessLevel.READ_ONLY)),
+) -> Dict[str, Any]:
+    """Get a single role by UUID for display purposes."""
+    from src.db_models.settings import AppRoleDb
+    
+    role = db.query(AppRoleDb).filter(AppRoleDb.id == role_id).first()
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+    
+    return {
+        "id": role.id,
+        "name": role.name,
+        "description": role.description,
+    }
+
+
 @router.get("/policy-usage/{policy_id}")
 async def get_policy_workflow_usage(
     policy_id: str,

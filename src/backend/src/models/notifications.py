@@ -28,8 +28,10 @@ class Notification(BaseModel):
     updated_at: Optional[datetime] = None
     read: bool = False
     can_delete: bool = True
-    recipient: Optional[str] = None
-    target_roles: Optional[List[str]] = None  # For role-based notifications
+    recipient: Optional[str] = None  # Email, username, or role name (legacy)
+    recipient_role_id: Optional[str] = None  # Role UUID for role-based recipients
+    recipient_role_name: Optional[str] = None  # Resolved role name for display
+    target_roles: Optional[List[str]] = None  # For role-based notifications (legacy)
     action_type: Optional[str] = None
     action_payload: Optional[Dict[str, Any]] = None
     data: Optional[Dict[str, Any]] = None  # Additional data for job progress etc.

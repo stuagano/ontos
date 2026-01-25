@@ -124,7 +124,7 @@ class ApprovalStepHandler(StepHandler):
             return StepResult(passed=False, error="No approvers configured")
         
         try:
-            # Resolve approvers
+            # Resolve approvers - returns list of (identifier, role_id or None)
             resolved_approvers = self._resolve_approvers(approvers, context)
             
             if not resolved_approvers:
@@ -134,7 +134,7 @@ class ApprovalStepHandler(StepHandler):
             
             # Create actionable notification for each approver
             created_count = 0
-            for approver in resolved_approvers:
+            for approver_id, role_uuid in resolved_approvers:
                 try:
                     # Build description with request details
                     description = (
@@ -155,7 +155,8 @@ class ApprovalStepHandler(StepHandler):
                         title="Approval Required",
                         subtitle=f"{context.entity_type}: {entity_display}",
                         description=description,
-                        recipient=approver,
+                        recipient=approver_id,  # Keep for backwards compat / email recipients
+                        recipient_role_id=role_uuid,  # Store role UUID if this is a role
                         action_type="workflow_approval",
                         action_payload={
                             "execution_id": context.execution_id,
@@ -172,23 +173,23 @@ class ApprovalStepHandler(StepHandler):
                     )
                     notification_repo.create(db=self._db, obj_in=notification)
                     created_count += 1
-                    logger.info(f"Approval notification created for {approver}")
+                    logger.info(f"Approval notification created for {approver_id}" + (f" (role: {role_uuid})" if role_uuid else ""))
                 except Exception as e:
-                    logger.warning(f"Failed to create approval notification for {approver}: {e}")
+                    logger.warning(f"Failed to create approval notification for {approver_id}: {e}")
             
             if created_count == 0:
                 return StepResult(
                     passed=False,
                     error="Failed to create approval notifications",
-                    data={'approvers': resolved_approvers}
+                    data={'approvers': [a[0] for a in resolved_approvers]}
                 )
             
             # Return blocking=True to pause workflow and wait for approval
             return StepResult(
                 passed=True,  # Initial pass, actual result comes when approval is handled
-                message=f"Approval requested from: {', '.join(resolved_approvers)}",
+                message=f"Approval requested from: {', '.join(a[0] for a in resolved_approvers)}",
                 data={
-                    'approvers': resolved_approvers,
+                    'approvers': [a[0] for a in resolved_approvers],
                     'timeout_days': timeout_days,
                     'require_all': require_all,
                     'status': 'pending',
@@ -200,29 +201,62 @@ class ApprovalStepHandler(StepHandler):
             logger.exception(f"Approval step failed: {e}")
             return StepResult(passed=False, error=str(e))
 
-    def _resolve_approvers(self, approvers: str, context: StepContext) -> List[str]:
-        """Resolve approver specification to user emails or role names.
+    def _lookup_role_id(self, role_name: str) -> Optional[str]:
+        """Look up a role by name (flexible matching) and return its UUID."""
+        from src.db_models.settings import AppRoleDb
         
-        For role names (e.g., 'DataSteward'), returns the role name as-is.
-        The notification system supports role-based recipients.
+        # Try exact match first
+        role = self._db.query(AppRoleDb).filter(AppRoleDb.name == role_name).first()
+        if role:
+            return role.id
+        
+        # Try normalized match (case-insensitive, no spaces)
+        normalized = role_name.lower().replace(' ', '')
+        all_roles = self._db.query(AppRoleDb).all()
+        for r in all_roles:
+            if r.name.lower().replace(' ', '') == normalized:
+                return r.id
+        
+        return None
+
+    def _resolve_approvers(self, approvers: str, context: StepContext) -> List[tuple]:
+        """Resolve approver specification to list of (identifier, role_uuid) tuples.
+        
+        Returns:
+            List of (identifier, role_uuid) where:
+            - identifier: email, username, or role name for display
+            - role_uuid: UUID if this is a role-based approver, None for direct users
         """
-        if approvers == 'domain_owners':
-            # Return role name for role-based notification
-            return ['DomainOwner']
-        elif approvers == 'project_owners':
-            return ['ProjectOwner']
-        elif approvers == 'data_stewards':
-            return ['DataSteward']
-        elif approvers == 'admins':
-            return ['Admin']
-        elif approvers == 'requester':
-            return [context.user_email] if context.user_email else []
+        from src.db_models.settings import AppRoleDb
+        
+        # Map shorthand names to role names (legacy support)
+        role_aliases = {
+            'domain_owners': 'DomainOwner',
+            'project_owners': 'ProjectOwner',
+            'data_stewards': 'DataSteward',
+            'admins': 'Admin',
+        }
+        
+        if approvers == 'requester':
+            return [(context.user_email, None)] if context.user_email else []
+        elif approvers in role_aliases:
+            # Legacy: shorthand alias
+            role_name = role_aliases[approvers]
+            role_id = self._lookup_role_id(role_name)
+            return [(role_name, role_id)]
         elif '@' in approvers:
             # Assume it's an email or comma-separated emails
-            return [e.strip() for e in approvers.split(',')]
+            return [(e.strip(), None) for e in approvers.split(',')]
         else:
-            # Assume it's a role/group name - use as-is
-            return [approvers]
+            # Check if it's a role UUID (preferred - new format)
+            role_by_id = self._db.query(AppRoleDb).filter(AppRoleDb.id == approvers).first()
+            if role_by_id:
+                # It's a UUID - use role name for display, UUID for matching
+                return [(role_by_id.name, role_by_id.id)]
+            
+            # Fallback: Assume it's a role name (legacy support)
+            role_id = self._lookup_role_id(approvers)
+            return [(approvers, role_id)]
 
 
 class NotificationStepHandler(StepHandler):
@@ -264,7 +298,7 @@ class NotificationStepHandler(StepHandler):
             
             # Create notifications for each recipient
             created_count = 0
-            for recipient in resolved_recipients:
+            for recipient_id, role_uuid in resolved_recipients:
                 try:
                     notification = Notification(
                         id=str(uuid4()),
@@ -273,7 +307,8 @@ class NotificationStepHandler(StepHandler):
                         title=title,
                         subtitle=f"{context.entity_type}: {context.entity_name}",
                         description=message,
-                        recipient=recipient,
+                        recipient=recipient_id,
+                        recipient_role_id=role_uuid,
                         action_type=action_type,
                         action_payload=action_payload,
                         can_delete=can_delete,
@@ -281,22 +316,22 @@ class NotificationStepHandler(StepHandler):
                     )
                     notification_repo.create(db=self._db, obj_in=notification)
                     created_count += 1
-                    logger.info(f"Notification created for {recipient}: {title}")
+                    logger.info(f"Notification created for {recipient_id}: {title}")
                 except Exception as e:
-                    logger.warning(f"Failed to create notification for {recipient}: {e}")
+                    logger.warning(f"Failed to create notification for {recipient_id}: {e}")
             
             if created_count == 0:
                 return StepResult(
                     passed=False,
                     error="Failed to create any notifications",
-                    data={'recipients': resolved_recipients, 'template': template}
+                    data={'recipients': [r[0] for r in resolved_recipients], 'template': template}
                 )
             
             return StepResult(
                 passed=True,
-                message=f"Notification sent to: {', '.join(resolved_recipients)}",
+                message=f"Notification sent to: {', '.join(r[0] for r in resolved_recipients)}",
                 data={
-                    'recipients': resolved_recipients,
+                    'recipients': [r[0] for r in resolved_recipients],
                     'template': template,
                     'message': message,
                     'created_count': created_count,
@@ -306,23 +341,55 @@ class NotificationStepHandler(StepHandler):
             logger.exception(f"Notification step failed: {e}")
             return StepResult(passed=False, error=str(e))
 
-    def _resolve_recipients(self, recipients: str, context: StepContext) -> List[str]:
-        """Resolve recipient specification to actual user emails or role names."""
+    def _lookup_role_id(self, role_name: str) -> Optional[str]:
+        """Look up a role by name (flexible matching) and return its UUID."""
+        from src.db_models.settings import AppRoleDb
+        
+        # Try exact match first
+        role = self._db.query(AppRoleDb).filter(AppRoleDb.name == role_name).first()
+        if role:
+            return role.id
+        
+        # Try normalized match (case-insensitive, no spaces)
+        normalized = role_name.lower().replace(' ', '')
+        all_roles = self._db.query(AppRoleDb).all()
+        for r in all_roles:
+            if r.name.lower().replace(' ', '') == normalized:
+                return r.id
+        
+        return None
+
+    def _resolve_recipients(self, recipients: str, context: StepContext) -> List[tuple]:
+        """Resolve recipient specification to list of (identifier, role_uuid) tuples."""
+        from src.db_models.settings import AppRoleDb
+        
+        role_aliases = {
+            'domain_owners': 'DomainOwner',
+            'data_stewards': 'DataSteward',
+        }
+        
         if recipients == 'requester':
-            return [context.user_email] if context.user_email else []
+            return [(context.user_email, None)] if context.user_email else []
         elif recipients == 'owner':
             owner = context.entity.get('owner')
-            return [owner] if owner else []
-        elif recipients == 'domain_owners':
-            # Could look up domain owners, for now return role name
-            return ['DomainOwner']
-        elif recipients == 'data_stewards':
-            return ['DataSteward']
+            return [(owner, None)] if owner else []
+        elif recipients in role_aliases:
+            # Legacy: shorthand alias
+            role_name = role_aliases[recipients]
+            role_id = self._lookup_role_id(role_name)
+            return [(role_name, role_id)]
         elif '@' in recipients:
-            return [e.strip() for e in recipients.split(',')]
+            return [(e.strip(), None) for e in recipients.split(',')]
         else:
-            # Assume it's a role/group name - use as-is for role-based notifications
-            return [recipients]
+            # Check if it's a role UUID (preferred - new format)
+            role_by_id = self._db.query(AppRoleDb).filter(AppRoleDb.id == recipients).first()
+            if role_by_id:
+                # It's a UUID - use role name for display, UUID for matching
+                return [(role_by_id.name, role_by_id.id)]
+            
+            # Fallback: Assume it's a role name (legacy support)
+            role_id = self._lookup_role_id(recipients)
+            return [(recipients, role_id)]
 
     def _get_template_title(self, template: str, context: StepContext) -> str:
         """Get notification title from template."""

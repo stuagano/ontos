@@ -22,6 +22,7 @@ import {
   getEntityTypeLabel,
   getStepIcon,
   getStepColor,
+  resolveRecipientDisplay,
   STEP_ICONS,
   STEP_COLORS,
 } from '@/lib/workflow-labels';
@@ -72,6 +73,7 @@ TriggerNode.displayName = 'TriggerNode';
 // Base Step Node Component
 interface StepNodeData {
   step: WorkflowStep;
+  rolesMap?: Record<string, string>;  // UUID -> name mapping for display
 }
 
 const StepNodeBase = memo(({ 
@@ -157,50 +159,60 @@ export const ValidationNode = memo((props: NodeProps<StepNodeData>) => (
 ValidationNode.displayName = 'ValidationNode';
 
 // Approval Node
-export const ApprovalNode = memo((props: NodeProps<StepNodeData>) => (
-  <Card className={`${baseNodeClass} border-amber-500 bg-amber-50 dark:bg-amber-950/30 ${props.selected ? 'ring-2 ring-amber-500' : ''}`}>
-    <Handle type="target" position={Position.Top} className="!bg-gray-400" />
-    <CardHeader className="p-3 pb-2">
-      <CardTitle className="text-sm flex items-center gap-2">
-        <UserCheck className="h-4 w-4 text-amber-500" />
-        {props.data.step.name || 'Approval'}
-      </CardTitle>
-    </CardHeader>
-    <CardContent className="p-3 pt-0">
-      <Badge variant="outline" className="text-xs">approval</Badge>
-      {(props.data.step.config as { approvers?: string })?.approvers && (
-        <div className="text-xs text-muted-foreground mt-1">
-          {(props.data.step.config as { approvers?: string }).approvers}
-        </div>
-      )}
-    </CardContent>
-    <Handle type="source" position={Position.Bottom} id="pass" className="!bg-green-500" style={{ left: '30%' }} />
-    <Handle type="source" position={Position.Bottom} id="fail" className="!bg-red-500" style={{ left: '70%' }} />
-  </Card>
-));
+export const ApprovalNode = memo((props: NodeProps<StepNodeData>) => {
+  const approversValue = (props.data.step.config as { approvers?: string })?.approvers;
+  const displayName = resolveRecipientDisplay(approversValue, props.data.rolesMap || {});
+  
+  return (
+    <Card className={`${baseNodeClass} border-amber-500 bg-amber-50 dark:bg-amber-950/30 ${props.selected ? 'ring-2 ring-amber-500' : ''}`}>
+      <Handle type="target" position={Position.Top} className="!bg-gray-400" />
+      <CardHeader className="p-3 pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <UserCheck className="h-4 w-4 text-amber-500" />
+          {props.data.step.name || 'Approval'}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-3 pt-0">
+        <Badge variant="outline" className="text-xs">approval</Badge>
+        {approversValue && (
+          <div className="text-xs text-muted-foreground mt-1">
+            {displayName}
+          </div>
+        )}
+      </CardContent>
+      <Handle type="source" position={Position.Bottom} id="pass" className="!bg-green-500" style={{ left: '30%' }} />
+      <Handle type="source" position={Position.Bottom} id="fail" className="!bg-red-500" style={{ left: '70%' }} />
+    </Card>
+  );
+});
 ApprovalNode.displayName = 'ApprovalNode';
 
 // Notification Node
-export const NotificationNode = memo((props: NodeProps<StepNodeData>) => (
-  <Card className={`${baseNodeClass} border-cyan-500 bg-cyan-50 dark:bg-cyan-950/30 ${props.selected ? 'ring-2 ring-cyan-500' : ''}`}>
-    <Handle type="target" position={Position.Top} className="!bg-gray-400" />
-    <CardHeader className="p-3 pb-2">
-      <CardTitle className="text-sm flex items-center gap-2">
-        <Bell className="h-4 w-4 text-cyan-500" />
-        {props.data.step.name || 'Notification'}
-      </CardTitle>
-    </CardHeader>
-    <CardContent className="p-3 pt-0">
-      <Badge variant="outline" className="text-xs">notification</Badge>
-      {(props.data.step.config as { recipients?: string })?.recipients && (
-        <div className="text-xs text-muted-foreground mt-1">
-          To: {(props.data.step.config as { recipients?: string }).recipients}
-        </div>
-      )}
-    </CardContent>
-    <Handle type="source" position={Position.Bottom} id="pass" className="!bg-green-500" />
-  </Card>
-));
+export const NotificationNode = memo((props: NodeProps<StepNodeData>) => {
+  const recipientsValue = (props.data.step.config as { recipients?: string })?.recipients;
+  const displayName = resolveRecipientDisplay(recipientsValue, props.data.rolesMap || {});
+  
+  return (
+    <Card className={`${baseNodeClass} border-cyan-500 bg-cyan-50 dark:bg-cyan-950/30 ${props.selected ? 'ring-2 ring-cyan-500' : ''}`}>
+      <Handle type="target" position={Position.Top} className="!bg-gray-400" />
+      <CardHeader className="p-3 pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Bell className="h-4 w-4 text-cyan-500" />
+          {props.data.step.name || 'Notification'}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-3 pt-0">
+        <Badge variant="outline" className="text-xs">notification</Badge>
+        {recipientsValue && (
+          <div className="text-xs text-muted-foreground mt-1">
+            To: {displayName}
+          </div>
+        )}
+      </CardContent>
+      <Handle type="source" position={Position.Bottom} id="pass" className="!bg-green-500" />
+    </Card>
+  );
+});
 NotificationNode.displayName = 'NotificationNode';
 
 // Assign Tag Node

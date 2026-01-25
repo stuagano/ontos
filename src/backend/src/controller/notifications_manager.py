@@ -70,53 +70,69 @@ class NotificationsManager:
         user_name = user_info.username  # Also check username for matching
 
         # Pre-fetch all role definitions for efficient lookup
-        # Create multiple mappings for flexible role name matching
+        # Create multiple mappings: by UUID, by name, and flexible name variants
         try:
-            all_roles = self._settings_manager.list_app_roles() # Assuming this uses DB and returns List[AppRole]
-            role_map: Dict[str, 'AppRole'] = {}
+            all_roles = self._settings_manager.list_app_roles()
+            role_by_id: Dict[str, 'AppRole'] = {}  # UUID -> role
+            role_by_name: Dict[str, 'AppRole'] = {}  # Name variants -> role
             for role in all_roles:
+                # Map by UUID
+                role_by_id[role.id] = role
                 # Map by exact name
-                role_map[role.name] = role
+                role_by_name[role.name] = role
                 # Also map by normalized name (no spaces, lowercase) for flexible matching
                 normalized = role.name.lower().replace(' ', '')
-                role_map[normalized] = role
+                role_by_name[normalized] = role
                 # Also try CamelCase variant
                 camel_case = ''.join(word.capitalize() for word in role.name.split())
-                role_map[camel_case] = role
+                role_by_name[camel_case] = role
         except Exception as e:
             logger.error(f"Failed to retrieve roles for notification filtering: {e}")
-            role_map = {} # Continue with empty map if roles fail
+            role_by_id = {}
+            role_by_name = {}
 
         # Check if user is an admin (member of Admin role's groups)
         is_admin = False
-        admin_role = role_map.get('Admin')
+        admin_role = role_by_name.get('Admin')
         if admin_role and admin_role.assigned_groups:
             is_admin = any(group in user_groups for group in admin_role.assigned_groups)
 
         filtered_notifications = []
         for n in all_notifications_api:
             is_recipient = False
+            target_role = None
             recipient = n.recipient
-
-            if not recipient: # Broadcast
+            
+            # Check recipient_role_id first (new, preferred method)
+            if n.recipient_role_id and n.recipient_role_id in role_by_id:
+                target_role = role_by_id[n.recipient_role_id]
+                # Populate role name for display
+                n.recipient_role_name = target_role.name
+            
+            if not recipient and not target_role:  # Broadcast
                 is_recipient = True
-            elif user_email and recipient == user_email: # Direct email match
+            elif user_email and recipient == user_email:  # Direct email match
                 is_recipient = True
-            elif user_name and recipient == user_name: # Direct username match
+            elif user_name and recipient == user_name:  # Direct username match
                 is_recipient = True
-            elif recipient in role_map: # Check if recipient matches a defined role name
-                target_role = role_map[recipient]
+            elif target_role:  # Role matched by UUID
                 if target_role.assigned_groups:
-                    # Role has groups - check if user is in any of them
                     if any(group in user_groups for group in target_role.assigned_groups):
                         is_recipient = True
                 else:
                     # Role has NO groups assigned - show to admins as fallback
                     if is_admin:
                         is_recipient = True
-                        logger.debug(
-                            f"Showing notification for orphaned role '{recipient}' to admin user"
-                        )
+            elif recipient in role_by_name:  # Legacy: recipient matches role name
+                target_role = role_by_name[recipient]
+                n.recipient_role_name = target_role.name  # Populate for display
+                if target_role.assigned_groups:
+                    if any(group in user_groups for group in target_role.assigned_groups):
+                        is_recipient = True
+                else:
+                    # Role has NO groups assigned - show to admins as fallback
+                    if is_admin:
+                        is_recipient = True
 
             if is_recipient:
                 filtered_notifications.append(n)

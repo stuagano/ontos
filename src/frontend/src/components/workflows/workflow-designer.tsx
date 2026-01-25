@@ -129,7 +129,10 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'TB') => 
 };
 
 // Convert workflow to React Flow elements
-const workflowToElements = (workflow: ProcessWorkflow | null) => {
+const workflowToElements = (
+  workflow: ProcessWorkflow | null,
+  rolesMap: Record<string, string> = {}
+) => {
   if (!workflow) return { nodes: [], edges: [] };
 
   const nodes: Node[] = [];
@@ -148,9 +151,9 @@ const workflowToElements = (workflow: ProcessWorkflow | null) => {
     nodes.push({
       id: step.step_id,
       type: step.step_type,
-      data: { step },
+      data: { step, rolesMap },
       position: step.position || { x: 0, y: (index + 1) * 120 },
-    });
+  });
   });
 
   // Connect trigger to first step
@@ -217,6 +220,7 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [stepTypes, setStepTypes] = useState<StepTypeSchema[]>([]);
   const [compliancePolicies, setCompliancePolicies] = useState<CompliancePolicyRef[]>([]);
+  const [availableRoles, setAvailableRoles] = useState<{ id: string; name: string; has_groups: boolean }[]>([]);
   
   // Form state
   const [name, setName] = useState('');
@@ -275,6 +279,19 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
         console.error('Failed to load compliance policies:', error);
         setCompliancePolicies([]);
       }
+      
+      // Load available roles for approval/notification step selectors
+      try {
+        const rolesResponse = await get<{ id: string; name: string; has_groups: boolean }[]>('/api/workflows/roles');
+        if (rolesResponse.data && Array.isArray(rolesResponse.data)) {
+          setAvailableRoles(rolesResponse.data);
+        } else {
+          setAvailableRoles([]);
+        }
+      } catch (error) {
+        console.error('Failed to load roles:', error);
+        setAvailableRoles([]);
+      }
 
       // Load workflow if editing
       if (!isNew) {
@@ -300,8 +317,9 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
               position: s.position,
             })));
             
-            // Convert to flow elements
-            const { nodes: flowNodes, edges: flowEdges } = workflowToElements(response.data);
+            // Convert to flow elements - rolesMap will be empty initially, but nodes will be updated
+            // when availableRoles loads (via updateNodesWithRoles effect)
+            const { nodes: flowNodes, edges: flowEdges } = workflowToElements(response.data, {});
             setNodes(flowNodes);
             setEdges(flowEdges);
           }
@@ -328,6 +346,28 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
     loadData();
   }, [id, isNew, get, toast, setNodes, setEdges]);
 
+  // Create rolesMap from availableRoles
+  const rolesMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    availableRoles.forEach(role => {
+      map[role.id] = role.name;
+    });
+    return map;
+  }, [availableRoles]);
+
+  // Update node data when rolesMap changes
+  useEffect(() => {
+    if (Object.keys(rolesMap).length > 0) {
+      setNodes(prevNodes => prevNodes.map(node => {
+        if (node.type === 'trigger') return node;
+        return {
+          ...node,
+          data: { ...node.data, rolesMap }
+        };
+      }));
+    }
+  }, [rolesMap, setNodes]);
+
   // Handle node selection
   const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     setSelectedNodeId(node.id);
@@ -346,11 +386,11 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
     
     setSteps(prev => [...prev, newStep]);
     
-    // Add node
+    // Add node with rolesMap
     const newNode: Node = {
       id: stepId,
       type: type,
-      data: { step: newStep },
+      data: { step: newStep, rolesMap },
       position: { x: 100, y: (nodes.length + 1) * 120 },
     };
     setNodes(prev => [...prev, newNode]);
@@ -713,9 +753,20 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
                             <SelectValue placeholder="Select recipients" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="requester">Requester</SelectItem>
-                            <SelectItem value="owner">Owner</SelectItem>
-                            <SelectItem value="domain_owners">Domain Owners</SelectItem>
+                            <SelectItem value="requester">Requester (Original User)</SelectItem>
+                            <SelectItem value="owner">Owner (Entity Owner)</SelectItem>
+                            {availableRoles.map((role) => (
+                              <SelectItem key={role.id} value={role.id}>
+                                <div className="flex items-center gap-2">
+                                  <span>{role.name}</span>
+                                  {!role.has_groups && (
+                                    <Badge variant="outline" className="text-xs text-amber-600">
+                                      No groups
+                                    </Badge>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
@@ -731,10 +782,15 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
                             <SelectValue placeholder="Select template" />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="request_submitted">Request Submitted</SelectItem>
+                            <SelectItem value="request_approved">Request Approved</SelectItem>
+                            <SelectItem value="request_rejected">Request Denied</SelectItem>
                             <SelectItem value="validation_failed">Validation Failed</SelectItem>
                             <SelectItem value="validation_passed">Validation Passed</SelectItem>
                             <SelectItem value="product_approved">Product Approved</SelectItem>
                             <SelectItem value="product_rejected">Product Rejected</SelectItem>
+                            <SelectItem value="dataset_updated">Dataset Updated</SelectItem>
+                            <SelectItem value="pii_detected">PII Detected</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -777,7 +833,7 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
                   {selectedStep.step_type === 'approval' && (
                     <>
                       <div>
-                        <Label>Approvers</Label>
+                        <Label>Approvers (Role)</Label>
                         <Select 
                           value={(selectedStep.config as { approvers?: string })?.approvers || ''}
                           onValueChange={(v) => updateStep(selectedStep.step_id, { 
@@ -785,13 +841,27 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
                           })}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Select approvers" />
+                            <SelectValue placeholder="Select role" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="domain_owners">Domain Owners</SelectItem>
-                            <SelectItem value="project_owners">Project Owners</SelectItem>
+                            {availableRoles.map((role) => (
+                              <SelectItem key={role.id} value={role.id}>
+                                <div className="flex items-center gap-2">
+                                  <span>{role.name}</span>
+                                  {!role.has_groups && (
+                                    <Badge variant="outline" className="text-xs text-amber-600">
+                                      No groups
+                                    </Badge>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="requester">Requester (Original User)</SelectItem>
                           </SelectContent>
                         </Select>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Role UUIDs ensure referential integrity if roles are renamed.
+                        </p>
                       </div>
                       <div>
                         <Label>Timeout (days)</Label>
