@@ -105,6 +105,30 @@ async def get_llm_config():
         logger.error("Error getting LLM config", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to get LLM config")
 
+
+@router.get('/settings/ui-customization')
+async def get_ui_customization():
+    """Get UI customization settings (publicly accessible for UI theming and branding).
+    
+    Returns settings for:
+    - i18n_enabled: Whether internationalization is enabled (disable forces English)
+    - custom_logo_url: URL to custom logo image
+    - about_content: Custom Markdown content for About page
+    - custom_css: Custom CSS to inject into the app
+    """
+    try:
+        app_settings = get_settings()
+        return {
+            "i18n_enabled": app_settings.UI_I18N_ENABLED,
+            "custom_logo_url": app_settings.UI_CUSTOM_LOGO_URL,
+            "about_content": sanitize_markdown_input(app_settings.UI_ABOUT_CONTENT) if app_settings.UI_ABOUT_CONTENT else None,
+            "custom_css": app_settings.UI_CUSTOM_CSS,
+        }
+    except Exception as e:
+        logger.error("Error getting UI customization settings", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get UI customization settings")
+
+
 @router.get('/settings/health')
 async def health_check(manager: SettingsManager = Depends(get_settings_manager)):
     """Check if the settings API is healthy"""

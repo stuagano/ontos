@@ -10,7 +10,8 @@
     "tags": "Tags",
     "search": "Suche",
     "mcpTokens": "MCP-Token",
-    "workflows": "Workflows"
+    "workflows": "Workflows",
+    "uiCustomization": "UI-Anpassung"
   },
   "accessDenied": {
     "title": "Zugriff verweigert",
@@ -331,6 +332,47 @@
       "copied": "Token in Zwischenablage kopiert",
       "revoked": "Token \"{{name}}\" wurde widerrufen",
       "revokeError": "Token konnte nicht widerrufen werden"
+    }
+  },
+  "uiCustomization": {
+    "title": "UI-Anpassung",
+    "description": "Passen Sie das Branding, die Spracheinstellungen und das Erscheinungsbild der Anwendung an.",
+    "i18n": {
+      "title": "Spracheinstellungen",
+      "enableLabel": "Internationalisierung aktivieren",
+      "enableDescription": "Wenn deaktiviert, verwendet die Anwendung immer Englisch, unabhängig von den Browser-Einstellungen."
+    },
+    "logo": {
+      "title": "Benutzerdefiniertes Logo",
+      "urlLabel": "Logo-URL",
+      "urlPlaceholder": "https://beispiel.de/logo.svg",
+      "help": "Geben Sie die URL Ihres benutzerdefinierten Logos ein. Unterstützt SVG, PNG oder JPG. Empfohlene Größe: 40x40 Pixel.",
+      "invalidUrl": "Bitte geben Sie eine gültige HTTP- oder HTTPS-URL ein",
+      "preview": "Vorschau:",
+      "loadError": "Bild konnte nicht geladen werden",
+      "openInNewTab": "In neuem Tab öffnen"
+    },
+    "about": {
+      "title": "Benutzerdefinierter Über-Seiten-Inhalt",
+      "description": "Ersetzen Sie den Standard-Inhalt der Über-Seite durch benutzerdefinierten Markdown. Leer lassen für Standard-Inhalt.",
+      "editTab": "Bearbeiten",
+      "previewTab": "Vorschau",
+      "placeholder": "# Über unser Unternehmen\n\nSchreiben Sie hier Ihren benutzerdefinierten Inhalt mit **Markdown**...",
+      "noContent": "Kein benutzerdefinierter Inhalt. Die Standard-Über-Seite wird angezeigt."
+    },
+    "css": {
+      "title": "Benutzerdefiniertes Stylesheet",
+      "warningTitle": "Mit Vorsicht verwenden",
+      "warningDescription": "Ungültiges oder konfliktierendes CSS kann die Benutzeroberfläche beschädigen. Falls die Anwendung nicht mehr nutzbar ist, leeren Sie dieses Feld. Änderungen erfordern ein Neuladen der Seite.",
+      "label": "Benutzerdefiniertes CSS",
+      "placeholder": "/* CSS-Variablen überschreiben */\n:root {\n  --primary: 220 70% 50%;\n}\n\n/* Benutzerdefinierte Stile */\n.meine-klasse {\n  color: red;\n}",
+      "help": "Geben Sie benutzerdefiniertes CSS ein, um das Standarddesign zu überschreiben. Sie können CSS-Variablen in :root ändern."
+    },
+    "saveButton": "UI-Einstellungen speichern",
+    "messages": {
+      "saveSuccess": "UI-Anpassungseinstellungen gespeichert",
+      "saveError": "UI-Anpassungseinstellungen konnten nicht gespeichert werden",
+      "reloadRequired": "Laden Sie die Seite neu, um einige Änderungen zu sehen."
     }
   }
 }

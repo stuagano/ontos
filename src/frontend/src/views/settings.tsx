@@ -18,6 +18,7 @@ import JobsSettings from '@/components/settings/jobs-settings';
 import SearchConfigEditor from '@/components/settings/search-config-editor';
 import MCPTokensSettings from '@/components/settings/mcp-tokens-settings';
 import GitSettings from '@/components/settings/git-settings';
+import UICustomizationSettings from '@/components/settings/ui-customization-settings';
 import { usePermissions } from '@/stores/permissions-store';
 import { FeatureAccessLevel } from '@/types/settings';
 import { useToast } from '@/hooks/use-toast';
@@ -66,7 +67,7 @@ export default function Settings() {
   
   // Determine the active tab from URL param or default to 'general'
   // Note: Workflows tab moved to Compliance view
-  const validTabs = ['general', 'git', 'delivery', 'jobs', 'roles', 'tags', 'semantic-models', 'search', 'mcp-tokens'];
+  const validTabs = ['general', 'git', 'delivery', 'jobs', 'roles', 'tags', 'semantic-models', 'search', 'mcp-tokens', 'ui-customization'];
   const activeTab = urlTab && validTabs.includes(urlTab) ? urlTab : 'general';
   
   // Tab display names for breadcrumbs
@@ -80,6 +81,7 @@ export default function Settings() {
     'semantic-models': t('settings:tabs.semanticModels', 'Semantic Models'),
     'search': t('settings:tabs.search', 'Search'),
     'mcp-tokens': t('settings:tabs.mcpTokens', 'MCP Tokens'),
+    'ui-customization': t('settings:tabs.uiCustomization', 'UI Customization'),
   };
 
   // Check if user has at least READ_ONLY access to settings
@@ -315,6 +317,7 @@ export default function Settings() {
           <TabsTrigger value="semantic-models">{t('settings:tabs.semanticModels')}</TabsTrigger>
           <TabsTrigger value="search">{t('settings:tabs.search', 'Search')}</TabsTrigger>
           <TabsTrigger value="mcp-tokens">{t('settings:tabs.mcpTokens', 'MCP Tokens')}</TabsTrigger>
+          <TabsTrigger value="ui-customization">{t('settings:tabs.uiCustomization', 'UI Customization')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
@@ -641,6 +644,9 @@ export default function Settings() {
         </TabsContent>
         <TabsContent value="mcp-tokens">
             <MCPTokensSettings />
+        </TabsContent>
+        <TabsContent value="ui-customization">
+            <UICustomizationSettings />
         </TabsContent>
       </Tabs>
 

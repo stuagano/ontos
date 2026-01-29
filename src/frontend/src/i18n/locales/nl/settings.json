@@ -10,7 +10,8 @@
     "tags": "Tags",
     "search": "Zoeken",
     "mcpTokens": "MCP Tokens",
-    "workflows": "Workflows"
+    "workflows": "Workflows",
+    "uiCustomization": "UI-aanpassing"
   },
   "accessDenied": {
     "title": "Toegang Geweigerd",
@@ -331,6 +332,47 @@
       "copied": "Token gekopieerd naar klembord",
       "revoked": "Token \"{{name}}\" is ingetrokken",
       "revokeError": "Kon token niet intrekken"
+    }
+  },
+  "uiCustomization": {
+    "title": "UI-aanpassing",
+    "description": "Pas de branding, taalinstellingen en weergave van de applicatie aan.",
+    "i18n": {
+      "title": "Taalinstellingen",
+      "enableLabel": "Internationalisering inschakelen",
+      "enableDescription": "Indien uitgeschakeld, gebruikt de applicatie altijd Engels."
+    },
+    "logo": {
+      "title": "Aangepast logo",
+      "urlLabel": "Logo URL",
+      "urlPlaceholder": "https://voorbeeld.nl/logo.svg",
+      "help": "Voer de URL van uw aangepaste logo in. Ondersteunde formaten: SVG, PNG, JPG.",
+      "invalidUrl": "Voer een geldige HTTP of HTTPS URL in",
+      "preview": "Voorbeeld:",
+      "loadError": "Afbeelding kon niet worden geladen",
+      "openInNewTab": "Open in nieuw tabblad"
+    },
+    "about": {
+      "title": "Aangepaste Over-pagina inhoud",
+      "description": "Vervang de standaard Over-pagina door aangepaste Markdown.",
+      "editTab": "Bewerken",
+      "previewTab": "Voorbeeld",
+      "placeholder": "# Over ons bedrijf\n\nSchrijf hier uw aangepaste inhoud met **Markdown**...",
+      "noContent": "Geen aangepaste inhoud. De standaard Over-pagina wordt weergegeven."
+    },
+    "css": {
+      "title": "Aangepast stylesheet",
+      "warningTitle": "Voorzichtig gebruiken",
+      "warningDescription": "Ongeldige CSS kan de interface breken. Wijzigingen vereisen herladen van de pagina.",
+      "label": "Aangepaste CSS",
+      "placeholder": "/* CSS-variabelen overschrijven */\n:root {\n  --primary: 220 70% 50%;\n}",
+      "help": "Voer aangepaste CSS in om het standaardthema te overschrijven."
+    },
+    "saveButton": "UI-instellingen opslaan",
+    "messages": {
+      "saveSuccess": "UI-aanpassingsinstellingen opgeslagen",
+      "saveError": "Kon instellingen niet opslaan",
+      "reloadRequired": "Herlaad de pagina om sommige wijzigingen te zien."
     }
   }
 }

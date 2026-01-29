@@ -10,7 +10,8 @@
     "tags": "タグ",
     "search": "検索",
     "mcpTokens": "MCPトークン",
-    "workflows": "ワークフロー"
+    "workflows": "ワークフロー",
+    "uiCustomization": "UIカスタマイズ"
   },
   "accessDenied": {
     "title": "アクセス拒否",
@@ -331,6 +332,47 @@
       "copied": "トークンをクリップボードにコピーしました",
       "revoked": "トークン「{{name}}」が取り消されました",
       "revokeError": "トークンの取り消しに失敗しました"
+    }
+  },
+  "uiCustomization": {
+    "title": "UIカスタマイズ",
+    "description": "アプリケーションのブランディング、言語設定、外観をカスタマイズします。",
+    "i18n": {
+      "title": "言語設定",
+      "enableLabel": "国際化を有効にする",
+      "enableDescription": "無効にすると、ブラウザの設定に関係なく常に英語が使用されます。"
+    },
+    "logo": {
+      "title": "カスタムロゴ",
+      "urlLabel": "ロゴURL",
+      "urlPlaceholder": "https://example.com/logo.svg",
+      "help": "カスタムロゴのURLを入力してください。SVG、PNG、JPG形式をサポート。推奨サイズ：40x40ピクセル。",
+      "invalidUrl": "有効なHTTPまたはHTTPS URLを入力してください",
+      "preview": "プレビュー：",
+      "loadError": "画像の読み込みに失敗しました",
+      "openInNewTab": "新しいタブで開く"
+    },
+    "about": {
+      "title": "カスタム「About」ページコンテンツ",
+      "description": "デフォルトのAboutページをカスタムMarkdownで置き換えます。",
+      "editTab": "編集",
+      "previewTab": "プレビュー",
+      "placeholder": "# 会社について\n\n**Markdown**を使用してカスタムコンテンツを記述してください...",
+      "noContent": "カスタムコンテンツがありません。デフォルトのAboutページが表示されます。"
+    },
+    "css": {
+      "title": "カスタムスタイルシート",
+      "warningTitle": "注意して使用してください",
+      "warningDescription": "無効なCSSはUIを壊す可能性があります。変更を反映するにはページをリロードしてください。",
+      "label": "カスタムCSS",
+      "placeholder": "/* CSS変数を上書き */\n:root {\n  --primary: 220 70% 50%;\n}",
+      "help": "デフォルトテーマを上書きするカスタムCSSを入力してください。"
+    },
+    "saveButton": "UI設定を保存",
+    "messages": {
+      "saveSuccess": "UIカスタマイズ設定を保存しました",
+      "saveError": "設定の保存に失敗しました",
+      "reloadRequired": "一部の変更を確認するにはページをリロードしてください。"
     }
   }
 }

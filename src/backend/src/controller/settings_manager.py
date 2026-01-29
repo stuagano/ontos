@@ -251,6 +251,23 @@ class SettingsManager:
             if 'GIT_PASSWORD' in all_settings and all_settings['GIT_PASSWORD'] is not None:
                 self._settings.GIT_PASSWORD = all_settings['GIT_PASSWORD']
                 logger.info("Loaded GIT_PASSWORD from database (masked)")
+            
+            # UI Customization settings
+            if 'UI_I18N_ENABLED' in all_settings and all_settings['UI_I18N_ENABLED'] is not None:
+                self._settings.UI_I18N_ENABLED = all_settings['UI_I18N_ENABLED'].lower() == 'true'
+                logger.info(f"Loaded UI_I18N_ENABLED from database: {self._settings.UI_I18N_ENABLED}")
+            
+            if 'UI_CUSTOM_LOGO_URL' in all_settings and all_settings['UI_CUSTOM_LOGO_URL'] is not None:
+                self._settings.UI_CUSTOM_LOGO_URL = all_settings['UI_CUSTOM_LOGO_URL']
+                logger.info("Loaded UI_CUSTOM_LOGO_URL from database")
+            
+            if 'UI_ABOUT_CONTENT' in all_settings and all_settings['UI_ABOUT_CONTENT'] is not None:
+                self._settings.UI_ABOUT_CONTENT = all_settings['UI_ABOUT_CONTENT']
+                logger.info("Loaded UI_ABOUT_CONTENT from database")
+            
+            if 'UI_CUSTOM_CSS' in all_settings and all_settings['UI_CUSTOM_CSS'] is not None:
+                self._settings.UI_CUSTOM_CSS = all_settings['UI_CUSTOM_CSS']
+                logger.info("Loaded UI_CUSTOM_CSS from database")
                 
         except Exception as e:
             logger.warning(f"Failed to load persisted settings from database: {e}")
@@ -1051,6 +1068,11 @@ class SettingsManager:
             'git_repo_url': self._settings.GIT_REPO_URL,
             'git_branch': self._settings.GIT_BRANCH,
             'git_username': self._settings.GIT_USERNAME,
+            # UI Customization settings
+            'ui_i18n_enabled': self._settings.UI_I18N_ENABLED,
+            'ui_custom_logo_url': self._settings.UI_CUSTOM_LOGO_URL,
+            'ui_about_content': self._settings.UI_ABOUT_CONTENT,
+            'ui_custom_css': self._settings.UI_CUSTOM_CSS,
         }
 
     def update_settings(self, settings: dict) -> Settings:
@@ -1332,6 +1354,31 @@ class SettingsManager:
             app_settings_repo.set(self._db, 'GIT_PASSWORD', value)
             self._settings.GIT_PASSWORD = value
             logger.info(f"Updated GIT_PASSWORD")
+        
+        # UI Customization settings
+        if 'ui_i18n_enabled' in settings:
+            value = settings.get('ui_i18n_enabled')
+            app_settings_repo.set(self._db, 'UI_I18N_ENABLED', str(value).lower() if value is not None else None)
+            self._settings.UI_I18N_ENABLED = bool(value) if value is not None else self._settings.UI_I18N_ENABLED
+            logger.info(f"Updated UI_I18N_ENABLED to: {value}")
+        
+        if 'ui_custom_logo_url' in settings:
+            value = settings.get('ui_custom_logo_url') or None
+            app_settings_repo.set(self._db, 'UI_CUSTOM_LOGO_URL', value)
+            self._settings.UI_CUSTOM_LOGO_URL = value
+            logger.info(f"Updated UI_CUSTOM_LOGO_URL")
+        
+        if 'ui_about_content' in settings:
+            value = settings.get('ui_about_content') or None
+            app_settings_repo.set(self._db, 'UI_ABOUT_CONTENT', value)
+            self._settings.UI_ABOUT_CONTENT = value
+            logger.info(f"Updated UI_ABOUT_CONTENT")
+        
+        if 'ui_custom_css' in settings:
+            value = settings.get('ui_custom_css') or None
+            app_settings_repo.set(self._db, 'UI_CUSTOM_CSS', value)
+            self._settings.UI_CUSTOM_CSS = value
+            logger.info(f"Updated UI_CUSTOM_CSS")
         
         # Reinitialize Git service if any Git settings were changed
         git_settings_changed = any(key in settings for key in ['git_repo_url', 'git_branch', 'git_username', 'git_password'])

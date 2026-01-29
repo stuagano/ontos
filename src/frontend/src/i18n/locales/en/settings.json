@@ -10,7 +10,8 @@
     "tags": "Tags",
     "search": "Search",
     "mcpTokens": "MCP Tokens",
-    "workflows": "Workflows"
+    "workflows": "Workflows",
+    "uiCustomization": "UI Customization"
   },
   "accessDenied": {
     "title": "Access Denied",
@@ -331,6 +332,47 @@
       "copied": "Token copied to clipboard",
       "revoked": "Token \"{{name}}\" has been revoked",
       "revokeError": "Failed to revoke token"
+    }
+  },
+  "uiCustomization": {
+    "title": "UI Customization",
+    "description": "Customize the application branding, language settings, and appearance.",
+    "i18n": {
+      "title": "Language Settings",
+      "enableLabel": "Enable Internationalization",
+      "enableDescription": "When disabled, the application will always use English regardless of browser settings."
+    },
+    "logo": {
+      "title": "Custom Logo",
+      "urlLabel": "Logo URL",
+      "urlPlaceholder": "https://example.com/logo.svg",
+      "help": "Enter the URL of your custom logo. Supports SVG, PNG, or JPG formats. Recommended size: 40x40 pixels.",
+      "invalidUrl": "Please enter a valid HTTP or HTTPS URL",
+      "preview": "Preview:",
+      "loadError": "Failed to load image",
+      "openInNewTab": "Open in new tab"
+    },
+    "about": {
+      "title": "Custom About Page Content",
+      "description": "Replace the default About page content with custom Markdown. Leave empty to use the default content.",
+      "editTab": "Edit",
+      "previewTab": "Preview",
+      "placeholder": "# About Our Company\n\nWrite your custom about page content here using **Markdown**...",
+      "noContent": "No custom content. The default About page will be shown."
+    },
+    "css": {
+      "title": "Custom Stylesheet",
+      "warningTitle": "Use with caution",
+      "warningDescription": "Invalid or conflicting CSS may break the UI. If the application becomes unusable, clear this field to restore normal functionality. Changes require a page reload.",
+      "label": "Custom CSS",
+      "placeholder": "/* Override CSS variables */\n:root {\n  --primary: 220 70% 50%;\n}\n\n/* Custom styles */\n.my-custom-class {\n  color: red;\n}",
+      "help": "Enter custom CSS to override the default theme. You can modify CSS variables defined in :root to change colors throughout the app."
+    },
+    "saveButton": "Save UI Settings",
+    "messages": {
+      "saveSuccess": "UI customization settings saved",
+      "saveError": "Failed to save UI customization settings",
+      "reloadRequired": "Reload the page to see some changes."
     }
   }
 }

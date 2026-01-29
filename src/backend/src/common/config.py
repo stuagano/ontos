@@ -152,6 +152,12 @@ class Settings(BaseSettings):
     DELIVERY_MODE_MANUAL: bool = Field(True, env='DELIVERY_MODE_MANUAL')  # Generate notifications for manual action
     DELIVERY_DIRECT_DRY_RUN: bool = Field(False, env='DELIVERY_DIRECT_DRY_RUN')  # Dry-run mode for direct delivery
 
+    # UI Customization settings
+    UI_I18N_ENABLED: bool = Field(True, env='UI_I18N_ENABLED')  # Enable/disable internationalization (disable forces English)
+    UI_CUSTOM_LOGO_URL: Optional[str] = Field(None, env='UI_CUSTOM_LOGO_URL')  # URL to custom logo image
+    UI_ABOUT_CONTENT: Optional[str] = Field(None, env='UI_ABOUT_CONTENT')  # Custom Markdown content for About page
+    UI_CUSTOM_CSS: Optional[str] = Field(None, env='UI_CUSTOM_CSS')  # Custom CSS to inject into the app
+
     # Replace nested Config class with model_config dictionary
     model_config = SettingsConfigDict(
         env_file=str(DOTENV_FILE), 

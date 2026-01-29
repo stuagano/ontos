@@ -60,6 +60,10 @@ for (const [lang, data] of Object.entries(fallbackSettingsByLang)) {
   }
 }
 
+// Check if i18n is disabled via settings (set in localStorage)
+// When disabled, we force English regardless of browser settings
+const isI18nDisabled = localStorage.getItem('i18n-disabled') === 'true';
+
 // Configure i18next
 i18n
   .use(LanguageDetector) // Detect user language
@@ -71,13 +75,15 @@ i18n
     ns: namespaces, // Available namespaces discovered from files
     load: 'languageOnly', // Normalize languages like en-US -> en
     supportedLngs: Object.keys(resources),
+    // Force English if i18n is disabled
+    lng: isI18nDisabled ? 'en' : undefined,
 
     interpolation: {
       escapeValue: false, // React already escapes values
     },
 
     detection: {
-      // Order of language detection
+      // Order of language detection (skipped if lng is set explicitly)
       order: ['localStorage', 'navigator'],
       // Cache user language
       caches: ['localStorage'],
@@ -88,5 +94,10 @@ i18n
       useSuspense: false, // Disable suspense for easier integration
     },
   });
+
+// Log i18n status
+if (isI18nDisabled) {
+  console.log('[i18n] Internationalization disabled - using English');
+}
 
 export default i18n;

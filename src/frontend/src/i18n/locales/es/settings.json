@@ -10,7 +10,8 @@
     "tags": "Etiquetas",
     "search": "Búsqueda",
     "mcpTokens": "Tokens MCP",
-    "workflows": "Flujos de trabajo"
+    "workflows": "Flujos de trabajo",
+    "uiCustomization": "Personalización UI"
   },
   "accessDenied": {
     "title": "Acceso denegado",
@@ -331,6 +332,47 @@
       "copied": "Token copiado al portapapeles",
       "revoked": "El token \"{{name}}\" ha sido revocado",
       "revokeError": "Error al revocar el token"
+    }
+  },
+  "uiCustomization": {
+    "title": "Personalización UI",
+    "description": "Personalice la marca, configuración de idioma y apariencia de la aplicación.",
+    "i18n": {
+      "title": "Configuración de idioma",
+      "enableLabel": "Habilitar internacionalización",
+      "enableDescription": "Cuando está deshabilitado, la aplicación siempre usará inglés."
+    },
+    "logo": {
+      "title": "Logo personalizado",
+      "urlLabel": "URL del logo",
+      "urlPlaceholder": "https://ejemplo.com/logo.svg",
+      "help": "Ingrese la URL de su logo personalizado. Formatos soportados: SVG, PNG, JPG.",
+      "invalidUrl": "Por favor ingrese una URL HTTP o HTTPS válida",
+      "preview": "Vista previa:",
+      "loadError": "Error al cargar la imagen",
+      "openInNewTab": "Abrir en nueva pestaña"
+    },
+    "about": {
+      "title": "Contenido personalizado de la página Acerca de",
+      "description": "Reemplace el contenido predeterminado con Markdown personalizado.",
+      "editTab": "Editar",
+      "previewTab": "Vista previa",
+      "placeholder": "# Acerca de nuestra empresa\n\nEscriba su contenido personalizado aquí con **Markdown**...",
+      "noContent": "Sin contenido personalizado. Se mostrará la página predeterminada."
+    },
+    "css": {
+      "title": "Hoja de estilos personalizada",
+      "warningTitle": "Usar con precaución",
+      "warningDescription": "CSS inválido puede romper la interfaz. Los cambios requieren recargar la página.",
+      "label": "CSS personalizado",
+      "placeholder": "/* Sobrescribir variables CSS */\n:root {\n  --primary: 220 70% 50%;\n}",
+      "help": "Ingrese CSS personalizado para sobrescribir el tema predeterminado."
+    },
+    "saveButton": "Guardar configuración UI",
+    "messages": {
+      "saveSuccess": "Configuración de personalización guardada",
+      "saveError": "Error al guardar la configuración",
+      "reloadRequired": "Recargue la página para ver algunos cambios."
     }
   }
 }

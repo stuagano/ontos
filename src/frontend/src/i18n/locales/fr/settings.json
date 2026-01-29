@@ -10,7 +10,8 @@
     "tags": "Tags",
     "search": "Recherche",
     "mcpTokens": "Jetons MCP",
-    "workflows": "Workflows"
+    "workflows": "Workflows",
+    "uiCustomization": "Personnalisation UI"
   },
   "accessDenied": {
     "title": "Accès refusé",
@@ -331,6 +332,47 @@
       "copied": "Jeton copié dans le presse-papiers",
       "revoked": "Le jeton \"{{name}}\" a été révoqué",
       "revokeError": "Échec de la révocation du jeton"
+    }
+  },
+  "uiCustomization": {
+    "title": "Personnalisation UI",
+    "description": "Personnalisez la marque, les paramètres de langue et l'apparence de l'application.",
+    "i18n": {
+      "title": "Paramètres de langue",
+      "enableLabel": "Activer l'internationalisation",
+      "enableDescription": "Lorsque désactivé, l'application utilisera toujours l'anglais."
+    },
+    "logo": {
+      "title": "Logo personnalisé",
+      "urlLabel": "URL du logo",
+      "urlPlaceholder": "https://exemple.com/logo.svg",
+      "help": "Entrez l'URL de votre logo personnalisé. Formats supportés: SVG, PNG, JPG. Taille recommandée: 40x40 pixels.",
+      "invalidUrl": "Veuillez entrer une URL HTTP ou HTTPS valide",
+      "preview": "Aperçu:",
+      "loadError": "Échec du chargement de l'image",
+      "openInNewTab": "Ouvrir dans un nouvel onglet"
+    },
+    "about": {
+      "title": "Contenu personnalisé de la page À propos",
+      "description": "Remplacez le contenu par défaut de la page À propos par du Markdown personnalisé.",
+      "editTab": "Modifier",
+      "previewTab": "Aperçu",
+      "placeholder": "# À propos de notre entreprise\n\nÉcrivez votre contenu personnalisé ici avec **Markdown**...",
+      "noContent": "Aucun contenu personnalisé. La page À propos par défaut sera affichée."
+    },
+    "css": {
+      "title": "Feuille de style personnalisée",
+      "warningTitle": "À utiliser avec précaution",
+      "warningDescription": "Un CSS invalide peut casser l'interface. Les changements nécessitent un rechargement de la page.",
+      "label": "CSS personnalisé",
+      "placeholder": "/* Remplacer les variables CSS */\n:root {\n  --primary: 220 70% 50%;\n}",
+      "help": "Entrez du CSS personnalisé pour remplacer le thème par défaut."
+    },
+    "saveButton": "Enregistrer les paramètres UI",
+    "messages": {
+      "saveSuccess": "Paramètres de personnalisation enregistrés",
+      "saveError": "Échec de l'enregistrement des paramètres",
+      "reloadRequired": "Rechargez la page pour voir certains changements."
     }
   }
 }
