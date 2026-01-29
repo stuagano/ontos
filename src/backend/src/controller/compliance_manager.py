@@ -167,7 +167,12 @@ class ComplianceManager:
     def get_policy(self, db: Session, policy_id: str) -> Optional[CompliancePolicyDb]:
         return db.get(CompliancePolicyDb, policy_id)
 
-    def create_policy(self, db: Session, policy: CompliancePolicy) -> CompliancePolicyDb:
+    def create_policy(
+        self, 
+        db: Session, 
+        policy: CompliancePolicy,
+        current_user: Optional[str] = None,
+    ) -> CompliancePolicyDb:
         db_obj = CompliancePolicyDb(
             id=str(policy.id),  # Convert UUID to string for SQLite
             name=policy.name,
@@ -179,11 +184,32 @@ class ComplianceManager:
             is_active=policy.is_active,
         )
         db.add(db_obj)
+        
+        # Log to change log for timeline
+        try:
+            from src.controller.change_log_manager import change_log_manager
+            change_log_manager.log_change_with_details(
+                db,
+                entity_type='compliance_policy',
+                entity_id=db_obj.id,
+                action='CREATE',
+                username=current_user,
+                details={"name": db_obj.name}
+            )
+        except Exception as log_err:
+            logger.warning(f"Failed to log change for policy creation: {log_err}")
+        
         db.commit()
         db.refresh(db_obj)
         return db_obj
 
-    def update_policy(self, db: Session, policy_id: str, policy: CompliancePolicy) -> Optional[CompliancePolicyDb]:
+    def update_policy(
+        self, 
+        db: Session, 
+        policy_id: str, 
+        policy: CompliancePolicy,
+        current_user: Optional[str] = None,
+    ) -> Optional[CompliancePolicyDb]:
         existing = db.get(CompliancePolicyDb, policy_id)
         if not existing:
             return None
@@ -195,14 +221,49 @@ class ComplianceManager:
         existing.severity = policy.severity
         existing.is_active = policy.is_active
         existing.updated_at = datetime.utcnow()
+        
+        # Log to change log for timeline
+        try:
+            from src.controller.change_log_manager import change_log_manager
+            change_log_manager.log_change_with_details(
+                db,
+                entity_type='compliance_policy',
+                entity_id=policy_id,
+                action='UPDATE',
+                username=current_user,
+                details={"name": existing.name}
+            )
+        except Exception as log_err:
+            logger.warning(f"Failed to log change for policy update: {log_err}")
+        
         db.commit()
         db.refresh(existing)
         return existing
 
-    def delete_policy(self, db: Session, policy_id: str) -> bool:
+    def delete_policy(
+        self, 
+        db: Session, 
+        policy_id: str,
+        current_user: Optional[str] = None,
+    ) -> bool:
         existing = db.get(CompliancePolicyDb, policy_id)
         if not existing:
             return False
+        
+        # Log to change log for timeline (before deletion)
+        try:
+            from src.controller.change_log_manager import change_log_manager
+            change_log_manager.log_change_with_details(
+                db,
+                entity_type='compliance_policy',
+                entity_id=policy_id,
+                action='DELETE',
+                username=current_user,
+                details={"name": existing.name},
+            )
+        except Exception as log_err:
+            logger.warning(f"Failed to log change for policy deletion: {log_err}")
+        
         db.delete(existing)
         db.commit()
         return True
@@ -422,7 +483,14 @@ class ComplianceManager:
                 })
         return objs
 
-    def run_policy_inline(self, db: Session, *, policy: CompliancePolicyDb, limit: Optional[int] = None) -> ComplianceRunDb:
+    def run_policy_inline(
+        self, 
+        db: Session, 
+        *, 
+        policy: CompliancePolicyDb, 
+        limit: Optional[int] = None,
+        current_user: Optional[str] = None,
+    ) -> ComplianceRunDb:
         """Run a compliance policy with enhanced DSL support.
 
         This method supports both the old simple DSL syntax and the new enhanced syntax
@@ -501,9 +569,39 @@ class ComplianceManager:
             total = max(1, success + failure)
             score = round(100.0 * (success / total), 2)
             self.complete_run(db, run, success_count=success, failure_count=failure, score=score)
+            
+            # Log to change log for timeline
+            try:
+                from src.controller.change_log_manager import change_log_manager
+                change_log_manager.log_change_with_details(
+                    db,
+                    entity_type='compliance_policy',
+                    entity_id=policy.id,
+                    action='RUN',
+                    username=current_user,
+                    details={"run_id": run.id, "status": run.status, "score": run.score}
+                )
+            except Exception as log_err:
+                logger.warning(f"Failed to log change for policy run: {log_err}")
+            
             return run
 
         except Exception as e:
             logger.exception("Compliance inline run failed")
             self.complete_run(db, run, success_count=success, failure_count=failure, score=0.0, error_message=str(e))
+            
+            # Log failed run to change log
+            try:
+                from src.controller.change_log_manager import change_log_manager
+                change_log_manager.log_change_with_details(
+                    db,
+                    entity_type='compliance_policy',
+                    entity_id=policy.id,
+                    action='RUN',
+                    username=current_user,
+                    details={"run_id": run.id, "status": run.status, "score": run.score, "error": str(e)}
+                )
+            except Exception as log_err:
+                logger.warning(f"Failed to log change for failed policy run: {log_err}")
+            
             return run

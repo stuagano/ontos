@@ -1901,6 +1901,25 @@ class DataContractsManager(DeliveryMixin, SearchableAsset):
             db.commit()
             db.refresh(created)
             
+            # Log to change log for timeline
+            try:
+                from src.controller.change_log_manager import change_log_manager
+                change_log_manager.log_change_with_details(
+                    db,
+                    entity_type="data_contract",
+                    entity_id=str(created.id),
+                    action="CREATE",
+                    username=current_user,
+                    details={
+                        "name": created.name,
+                        "version": created.version,
+                        "status": created.status,
+                        "summary": f"Contract '{created.name}' created" + (f" by {current_user}" if current_user else ""),
+                    },
+                )
+            except Exception as log_err:
+                logger.warning(f"Failed to log change for contract creation: {log_err}")
+            
             # Queue delivery for active modes
             self._queue_delivery(
                 entity=created,
@@ -2100,6 +2119,25 @@ class DataContractsManager(DeliveryMixin, SearchableAsset):
             db.commit()
             db.refresh(updated)
             
+            # Log to change log for timeline
+            try:
+                from src.controller.change_log_manager import change_log_manager
+                change_log_manager.log_change_with_details(
+                    db,
+                    entity_type="data_contract",
+                    entity_id=str(updated.id),
+                    action="UPDATE",
+                    username=current_user,
+                    details={
+                        "name": updated.name,
+                        "version": updated.version,
+                        "status": updated.status,
+                        "summary": f"Contract '{updated.name}' updated" + (f" by {current_user}" if current_user else ""),
+                    },
+                )
+            except Exception as log_err:
+                logger.warning(f"Failed to log change for contract update: {log_err}")
+            
             # Queue delivery for active modes
             self._queue_delivery(
                 entity=updated,
@@ -2117,6 +2155,57 @@ class DataContractsManager(DeliveryMixin, SearchableAsset):
             db.rollback()
             logger.error(f"Error updating contract with relations: {e}", exc_info=True)
             raise
+    
+    def delete_contract_from_db(
+        self,
+        db,
+        contract_id: str,
+        current_user: Optional[str] = None,
+    ) -> bool:
+        """
+        Delete a contract from the database with change logging.
+        
+        Args:
+            db: Database session
+            contract_id: ID of the contract to delete
+            current_user: Username of the user performing the deletion
+            
+        Returns:
+            True if deletion was successful
+            
+        Raises:
+            ValueError: If contract not found
+        """
+        from src.repositories.data_contracts_repository import data_contract_repo
+        
+        # Get contract info before deletion for logging
+        db_obj = data_contract_repo.get(db, id=contract_id)
+        if not db_obj:
+            raise ValueError(f"Contract {contract_id} not found")
+        
+        contract_name = db_obj.name
+        
+        # Perform deletion
+        data_contract_repo.remove(db=db, id=contract_id)
+        
+        # Log to change log for timeline
+        try:
+            from src.controller.change_log_manager import change_log_manager
+            change_log_manager.log_change_with_details(
+                db,
+                entity_type="data_contract",
+                entity_id=contract_id,
+                action="DELETE",
+                username=current_user,
+                details={
+                    "name": contract_name,
+                    "summary": f"Contract '{contract_name}' deleted" + (f" by {current_user}" if current_user else ""),
+                },
+            )
+        except Exception as log_err:
+            logger.warning(f"Failed to log change for contract deletion: {log_err}")
+        
+        return True
     
     def parse_uploaded_file(self, file_content: str, filename: str, content_type: str) -> dict:
         """

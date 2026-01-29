@@ -6,7 +6,6 @@ from src.common.dependencies import DBSessionDep, AuditManagerDep, AuditCurrentU
 from src.common.features import FeatureAccessLevel
 from src.common.authorization import PermissionChecker
 from src.controller.compliance_manager import ComplianceManager
-from src.controller.change_log_manager import change_log_manager
 from src.models.compliance import (
     CompliancePolicy,
     ComplianceRun,
@@ -62,14 +61,10 @@ async def create_policy(
     policy: CompliancePolicy = Body(...),
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_WRITE)),
 ):
-    created = manager.create_policy(db, policy)
-    change_log_manager.log_change_with_details(
-        db,
-        entity_type='compliance_policy',
-        entity_id=created.id,
-        action='CREATE',
-        username=current_user.username if current_user else None,
-        details={"name": created.name}
+    created = manager.create_policy(
+        db, 
+        policy, 
+        current_user=current_user.username if current_user else None
     )
     return {
         'id': created.id,
@@ -96,17 +91,14 @@ async def update_policy(
     policy: CompliancePolicy = Body(...),
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_WRITE)),
 ):
-    updated = manager.update_policy(db, policy_id, policy)
+    updated = manager.update_policy(
+        db, 
+        policy_id, 
+        policy,
+        current_user=current_user.username if current_user else None
+    )
     if not updated:
         raise HTTPException(status_code=404, detail="Policy not found")
-    change_log_manager.log_change_with_details(
-        db,
-        entity_type='compliance_policy',
-        entity_id=policy_id,
-        action='UPDATE',
-        username=current_user.username if current_user else None,
-        details={"name": updated.name}
-    )
     return {
         'id': updated.id,
         'name': updated.name,
@@ -127,17 +119,13 @@ async def delete_policy(
     current_user: AuditCurrentUserDep,
     _: bool = Depends(PermissionChecker(FEATURE_ID, FeatureAccessLevel.READ_WRITE)),
 ):
-    ok = manager.delete_policy(db, policy_id)
+    ok = manager.delete_policy(
+        db, 
+        policy_id,
+        current_user=current_user.username if current_user else None
+    )
     if not ok:
         raise HTTPException(status_code=404, detail="Policy not found")
-    change_log_manager.log_change_with_details(
-        db,
-        entity_type='compliance_policy',
-        entity_id=policy_id,
-        action='DELETE',
-        username=current_user.username if current_user else None,
-        details=None,
-    )
     return {"status": "success"}
 
 
@@ -154,14 +142,11 @@ async def run_policy(
         raise HTTPException(status_code=404, detail="Policy not found")
 
     # For now, implement inline only; async can be backed by Databricks job later
-    run = manager.run_policy_inline(db, policy=policy, limit=payload.limit)
-    change_log_manager.log_change_with_details(
-        db,
-        entity_type='compliance_policy',
-        entity_id=policy_id,
-        action='RUN',
-        username=current_user.username if current_user else None,
-        details={"run_id": run.id, "status": run.status, "score": run.score}
+    run = manager.run_policy_inline(
+        db, 
+        policy=policy, 
+        limit=payload.limit,
+        current_user=current_user.username if current_user else None
     )
     return {
         'id': run.id,

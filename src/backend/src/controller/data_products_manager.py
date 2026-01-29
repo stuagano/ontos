@@ -158,6 +158,24 @@ class DataProductsManager(DeliveryMixin, SearchableAsset):
             # Load product with tags
             result = self._load_product_with_tags(created_db_obj)
             
+            # Log to change log for timeline
+            try:
+                from src.controller.change_log_manager import change_log_manager
+                change_log_manager.log_change_with_details(
+                    db_session,
+                    entity_type="data_product",
+                    entity_id=str(created_db_obj.id),
+                    action="CREATE",
+                    username=user,
+                    details={
+                        "name": result.name,
+                        "status": result.status.value if hasattr(result.status, 'value') else result.status,
+                        "summary": f"Product '{result.name}' created" + (f" by {user}" if user else ""),
+                    },
+                )
+            except Exception as log_err:
+                logger.warning(f"Failed to log change for product creation: {log_err}")
+            
             # Queue delivery for active modes
             self._queue_delivery(
                 entity=created_db_obj,
@@ -289,6 +307,24 @@ class DataProductsManager(DeliveryMixin, SearchableAsset):
             # Load product with tags
             result = self._load_product_with_tags(updated_db_obj)
             
+            # Log to change log for timeline
+            try:
+                from src.controller.change_log_manager import change_log_manager
+                change_log_manager.log_change_with_details(
+                    db_session,
+                    entity_type="data_product",
+                    entity_id=str(product_id),
+                    action="UPDATE",
+                    username=user,
+                    details={
+                        "name": result.name,
+                        "status": result.status.value if hasattr(result.status, 'value') else result.status,
+                        "summary": f"Product '{result.name}' updated" + (f" by {user}" if user else ""),
+                    },
+                )
+            except Exception as log_err:
+                logger.warning(f"Failed to log change for product update: {log_err}")
+            
             # Queue delivery for active modes
             self._queue_delivery(
                 entity=updated_db_obj,
@@ -389,10 +425,33 @@ class DataProductsManager(DeliveryMixin, SearchableAsset):
             db_session.rollback()
             raise
 
-    def delete_product(self, product_id: str) -> bool:
+    def delete_product(self, product_id: str, user: Optional[str] = None) -> bool:
         """Delete an ODPS v1.0.0 data product."""
         try:
+            # Get product info before deletion for change log
+            product_db = self._repo.get(db=self._db, id=product_id)
+            product_name = product_db.name if product_db else None
+            
             deleted_obj = self._repo.remove(db=self._db, id=product_id)
+            
+            if deleted_obj:
+                # Log to change log for timeline
+                try:
+                    from src.controller.change_log_manager import change_log_manager
+                    change_log_manager.log_change_with_details(
+                        self._db,
+                        entity_type="data_product",
+                        entity_id=str(product_id),
+                        action="DELETE",
+                        username=user,
+                        details={
+                            "name": product_name,
+                            "summary": f"Product '{product_name}' deleted" + (f" by {user}" if user else ""),
+                        },
+                    )
+                except Exception as log_err:
+                    logger.warning(f"Failed to log change for product deletion: {log_err}")
+            
             return deleted_obj is not None
         except SQLAlchemyError as e:
             logger.error(f"Database error deleting product {product_id}: {e}")
@@ -469,6 +528,25 @@ class DataProductsManager(DeliveryMixin, SearchableAsset):
                 f"Product {product_id} status transitioned: {old_status} → {new_status_lower}"
                 + (f" by {current_user}" if current_user else "")
             )
+            
+            # Log to change log for timeline
+            try:
+                from src.controller.change_log_manager import change_log_manager
+                change_log_manager.log_change_with_details(
+                    self._db,
+                    entity_type="data_product",
+                    entity_id=str(product_id),
+                    action="STATUS_CHANGE",
+                    username=current_user,
+                    details={
+                        "name": product_db.name,
+                        "from_status": old_status,
+                        "to_status": new_status_lower,
+                        "summary": f"Status changed from '{old_status}' to '{new_status_lower}'" + (f" by {current_user}" if current_user else ""),
+                    },
+                )
+            except Exception as log_err:
+                logger.warning(f"Failed to log change for product status transition: {log_err}")
             
             # Notify subscribers about important status changes
             self._notify_subscribers_of_status_change(

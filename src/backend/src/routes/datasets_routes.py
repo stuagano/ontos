@@ -322,7 +322,7 @@ async def delete_dataset(
     
     manager = get_datasets_manager(request)
     
-    success = manager.delete_dataset(dataset_id)
+    success = manager.delete_dataset(dataset_id, deleted_by=current_user.username if current_user else None)
     
     if not success:
         raise HTTPException(

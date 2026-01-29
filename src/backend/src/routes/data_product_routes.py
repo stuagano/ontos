@@ -37,7 +37,6 @@ from src.common.dependencies import (
     AuditManagerDep,
     AuditCurrentUserDep
 )
-from src.controller.change_log_manager import change_log_manager
 from src.models.notifications import NotificationType
 from src.common.dependencies import NotificationsManagerDep, CurrentUserDep, DBSessionDep
 
@@ -814,7 +813,7 @@ async def create_data_product(
                     detail="You must be a member of the project to create a product in it"
                 )
 
-        created_product_response = manager.create_product(payload, db=db)
+        created_product_response = manager.create_product(payload, db=db, user=current_user.username if current_user else None)
         success = True
 
         if created_product_response and hasattr(created_product_response, 'id'):
@@ -1123,7 +1122,7 @@ async def delete_data_product(
 
     try:
         logger.info(f"Received request to delete data product ID: {product_id}")
-        deleted = manager.delete_product(product_id)
+        deleted = manager.delete_product(product_id, user=current_user.username if current_user else None)
         if not deleted:
             response_status_code = 404
             exc = HTTPException(status_code=response_status_code, detail="Data product not found")

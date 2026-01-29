@@ -235,6 +235,24 @@ class DatasetsManager(DeliveryMixin, SearchableAsset):
             logger.info(f"Created dataset {dataset_id}: {data.name}")
             result = self._to_api_model(db_dataset)
             
+            # Log to change log for timeline
+            try:
+                from src.controller.change_log_manager import change_log_manager
+                change_log_manager.log_change_with_details(
+                    self._db,
+                    entity_type="dataset",
+                    entity_id=str(dataset_id),
+                    action="CREATE",
+                    username=created_by,
+                    details={
+                        "name": data.name,
+                        "status": data.status or "draft",
+                        "summary": f"Dataset '{data.name}' created" + (f" by {created_by}" if created_by else ""),
+                    },
+                )
+            except Exception as log_err:
+                logger.warning(f"Failed to log change for dataset creation: {log_err}")
+            
             # Queue delivery for active modes
             self._queue_delivery(
                 entity=db_dataset,
@@ -321,6 +339,24 @@ class DatasetsManager(DeliveryMixin, SearchableAsset):
             logger.info(f"Updated dataset {dataset_id}")
             result = self._to_api_model(db_dataset)
             
+            # Log to change log for timeline
+            try:
+                from src.controller.change_log_manager import change_log_manager
+                change_log_manager.log_change_with_details(
+                    self._db,
+                    entity_type="dataset",
+                    entity_id=str(dataset_id),
+                    action="UPDATE",
+                    username=updated_by,
+                    details={
+                        "name": db_dataset.name,
+                        "status": db_dataset.status,
+                        "summary": f"Dataset '{db_dataset.name}' updated" + (f" by {updated_by}" if updated_by else ""),
+                    },
+                )
+            except Exception as log_err:
+                logger.warning(f"Failed to log change for dataset update: {log_err}")
+            
             # Queue delivery for active modes
             self._queue_delivery(
                 entity=db_dataset,
@@ -336,14 +372,35 @@ class DatasetsManager(DeliveryMixin, SearchableAsset):
             self._db.rollback()
             raise
 
-    def delete_dataset(self, dataset_id: str) -> bool:
+    def delete_dataset(self, dataset_id: str, deleted_by: Optional[str] = None) -> bool:
         """Delete a dataset and all related data."""
         try:
             db_dataset = dataset_repo.get(db=self._db, id=dataset_id)
             if not db_dataset:
                 return False
             
+            # Capture name before deletion for change log
+            dataset_name = db_dataset.name
+            
             self._db.delete(db_dataset)
+            
+            # Log to change log for timeline (before flush/commit)
+            try:
+                from src.controller.change_log_manager import change_log_manager
+                change_log_manager.log_change_with_details(
+                    self._db,
+                    entity_type="dataset",
+                    entity_id=str(dataset_id),
+                    action="DELETE",
+                    username=deleted_by,
+                    details={
+                        "name": dataset_name,
+                        "summary": f"Dataset '{dataset_name}' deleted" + (f" by {deleted_by}" if deleted_by else ""),
+                    },
+                )
+            except Exception as log_err:
+                logger.warning(f"Failed to log change for dataset deletion: {log_err}")
+            
             self._db.flush()
             
             logger.info(f"Deleted dataset {dataset_id}")
@@ -908,6 +965,25 @@ class DatasetsManager(DeliveryMixin, SearchableAsset):
             
             logger.info(f"User {email} subscribed to dataset {dataset_id}")
             
+            # Log to change log for timeline
+            try:
+                from src.controller.change_log_manager import change_log_manager
+                change_log_manager.log_change_with_details(
+                    self._db,
+                    entity_type="dataset",
+                    entity_id=dataset_id,
+                    action="SUBSCRIBE",
+                    username=email,
+                    details={
+                        "name": db_dataset.name,
+                        "subscriber_email": email,
+                        "reason": reason,
+                        "summary": f"User '{email}' subscribed to dataset '{db_dataset.name}'",
+                    },
+                )
+            except Exception as log_err:
+                logger.warning(f"Failed to log subscription change: {log_err}")
+            
             # Trigger subscription workflow
             try:
                 from src.common.workflow_triggers import get_trigger_registry
@@ -970,6 +1046,24 @@ class DatasetsManager(DeliveryMixin, SearchableAsset):
             
             if success:
                 logger.info(f"User {email} unsubscribed from dataset {dataset_id}")
+                
+                # Log to change log for timeline
+                try:
+                    from src.controller.change_log_manager import change_log_manager
+                    change_log_manager.log_change_with_details(
+                        self._db,
+                        entity_type="dataset",
+                        entity_id=dataset_id,
+                        action="UNSUBSCRIBE",
+                        username=email,
+                        details={
+                            "name": dataset_name,
+                            "subscriber_email": email,
+                            "summary": f"User '{email}' unsubscribed from dataset '{dataset_name}'",
+                        },
+                    )
+                except Exception as log_err:
+                    logger.warning(f"Failed to log unsubscription change: {log_err}")
                 
                 # Trigger unsubscribe workflow
                 try:

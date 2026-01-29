@@ -50,7 +50,6 @@ from src.common.odcs_validation import validate_odcs_contract, ODCSValidationErr
 from src.common.authorization import PermissionChecker, ApprovalChecker
 from src.common.features import FeatureAccessLevel
 from src.common.file_security import sanitize_filename, sanitize_filename_for_header
-from src.controller.change_log_manager import change_log_manager
 from src.models.notifications import NotificationType, Notification
 from src.models.data_asset_reviews import AssetType, ReviewedAssetStatus
 from src.common.deployment_dependencies import get_deployment_policy_manager
@@ -969,17 +968,22 @@ async def delete_contract(
         "params": {"contract_id": contract_id}
     }
     try:
-        db_obj = data_contract_repo.get(db, id=contract_id)
-        if not db_obj:
-            response_status_code = 404
-            exc = HTTPException(status_code=response_status_code, detail="Contract not found")
-            details_for_audit["exception"] = {"type": "HTTPException", "status_code": exc.status_code, "detail": exc.detail}
-            raise exc
-        data_contract_repo.remove(db=db, id=contract_id)
+        # Use manager method which handles deletion and change logging
+        manager.delete_contract_from_db(
+            db=db,
+            contract_id=contract_id,
+            current_user=current_user.username if current_user else None,
+        )
+        
         db.commit()
         success = True
         response_status_code = 204
         return None
+    except ValueError as e:
+        response_status_code = 404
+        exc = HTTPException(status_code=response_status_code, detail=str(e))
+        details_for_audit["exception"] = {"type": "HTTPException", "status_code": exc.status_code, "detail": exc.detail}
+        raise exc
     except HTTPException:
         raise
     except Exception as e:

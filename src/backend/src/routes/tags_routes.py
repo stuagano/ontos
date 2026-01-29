@@ -652,7 +652,7 @@ async def remove_tag_from_entity_route(
     }
 
     try:
-        ok = manager.remove_tag_from_entity(db, entity_id=entity_id, entity_type=entity_type, tag_id=tag_id)
+        ok = manager.remove_tag_from_entity(db, entity_id=entity_id, entity_type=entity_type, tag_id=tag_id, user_email=current_user.email if current_user else None)
         if not ok:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag association not found")
         success = True

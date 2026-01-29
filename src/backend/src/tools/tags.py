@@ -585,7 +585,8 @@ class RemoveTagFromEntityTool(BaseTool):
                 ctx.db,
                 entity_id=entity_id,
                 entity_type=entity_type,
-                tag_id=UUID(tag_id)
+                tag_id=UUID(tag_id),
+                user_email=ctx.user_email if hasattr(ctx, 'user_email') else None
             )
             
             if not success:

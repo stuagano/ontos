@@ -178,6 +178,30 @@ class TagsManager(DeliveryMixin, SearchableAsset):
             tag_repo=self._tag_repo,
             ns_repo=ns_repo,
         )
+        
+        # Log to change log for timeline
+        if tags:
+            try:
+                from src.controller.change_log_manager import change_log_manager
+                tag_names = [t.tag_fqn if hasattr(t, 'tag_fqn') else str(t) for t in tags[:5]]
+                tag_summary = ", ".join(tag_names)
+                if len(tags) > 5:
+                    tag_summary += f", ... ({len(tags)} total)"
+                change_log_manager.log_change_with_details(
+                    db,
+                    entity_type=entity_type,
+                    entity_id=str(entity_id),
+                    action="TAGS_SET",
+                    username=user_email,
+                    details={
+                        "tag_count": len(tags),
+                        "tags": tag_summary,
+                        "summary": f"Tags updated: {tag_summary}" + (f" by {user_email}" if user_email else ""),
+                    },
+                )
+            except Exception as log_err:
+                logger.warning(f"Failed to log change for tag set: {log_err}")
+        
         db.commit()
         return assigned
 
@@ -190,25 +214,70 @@ class TagsManager(DeliveryMixin, SearchableAsset):
             assigned_value=assigned_value,
             assigned_by=user_email,
         )
-        db.commit()
+        
         # Build AssignedTag result
         tag_db = self._tag_repo.get(db, id=tag_id)
         ns = self._namespace_repo.get(db, id=tag_db.namespace_id) if tag_db and tag_db.namespace_id else None
+        tag_fqn = f"{(ns.name if ns else DEFAULT_NAMESPACE_NAME)}{TAG_NAMESPACE_SEPARATOR}{tag_db.name}"
+        
+        # Log to change log for timeline
+        try:
+            from src.controller.change_log_manager import change_log_manager
+            change_log_manager.log_change_with_details(
+                db,
+                entity_type=entity_type,
+                entity_id=str(entity_id),
+                action="TAG_ASSIGN",
+                username=user_email,
+                details={
+                    "tag": tag_fqn,
+                    "assigned_value": assigned_value,
+                    "summary": f"Tag '{tag_fqn}' assigned" + (f" with value '{assigned_value}'" if assigned_value else "") + (f" by {user_email}" if user_email else ""),
+                },
+            )
+        except Exception as log_err:
+            logger.warning(f"Failed to log change for tag assign: {log_err}")
+        
+        db.commit()
+        
         return AssignedTag(
             tag_id=tag_db.id,
             tag_name=tag_db.name,
             namespace_id=tag_db.namespace_id,
             namespace_name=ns.name if ns else DEFAULT_NAMESPACE_NAME,
             status=TagStatus(tag_db.status),
-            fully_qualified_name=f"{(ns.name if ns else DEFAULT_NAMESPACE_NAME)}{TAG_NAMESPACE_SEPARATOR}{tag_db.name}",
+            fully_qualified_name=tag_fqn,
             assigned_value=assoc.assigned_value,
             assigned_by=assoc.assigned_by,
             assigned_at=assoc.assigned_at,
         )
 
-    def remove_tag_from_entity(self, db: Session, *, entity_id: str, entity_type: str, tag_id: UUID) -> bool:
+    def remove_tag_from_entity(self, db: Session, *, entity_id: str, entity_type: str, tag_id: UUID, user_email: Optional[str] = None) -> bool:
+        # Get tag info before removal for change log
+        tag_db = self._tag_repo.get(db, id=tag_id)
+        tag_fqn = None
+        if tag_db:
+            ns = self._namespace_repo.get(db, id=tag_db.namespace_id) if tag_db.namespace_id else None
+            tag_fqn = f"{(ns.name if ns else DEFAULT_NAMESPACE_NAME)}{TAG_NAMESPACE_SEPARATOR}{tag_db.name}"
+        
         ok = self._entity_assoc_repo.remove_tag_from_entity(db, entity_id=entity_id, entity_type=entity_type, tag_id=tag_id)
         if ok:
+            # Log to change log for timeline
+            try:
+                from src.controller.change_log_manager import change_log_manager
+                change_log_manager.log_change_with_details(
+                    db,
+                    entity_type=entity_type,
+                    entity_id=str(entity_id),
+                    action="TAG_REMOVE",
+                    username=user_email,
+                    details={
+                        "tag": tag_fqn or str(tag_id),
+                        "summary": f"Tag '{tag_fqn or str(tag_id)}' removed" + (f" by {user_email}" if user_email else ""),
+                    },
+                )
+            except Exception as log_err:
+                logger.warning(f"Failed to log change for tag removal: {log_err}")
             db.commit()
         return ok
 
