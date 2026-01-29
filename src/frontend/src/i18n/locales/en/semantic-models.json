@@ -84,6 +84,12 @@
   "actions": {
     "createConcept": "Create Concept",
     "createCollection": "Create Collection"
+  },
+  "dialogs": {
+    "deleteConcept": {
+      "title": "Delete Concept",
+      "description": "Are you sure you want to delete \"{{label}}\"? This action cannot be undone. Only draft concepts can be deleted."
+    }
   }
 }
 

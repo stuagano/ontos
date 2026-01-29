@@ -31,7 +31,17 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ColumnDef } from '@tanstack/react-table';
 import {
@@ -47,6 +57,8 @@ import {
   Filter,
   FolderTree,
   Link2,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import ReactFlow, { Node, Edge, Background, MarkerType, Controls, ConnectionMode } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -470,12 +482,35 @@ const UnifiedConceptTree: React.FC<UnifiedConceptTreeProps> = ({
 interface ConceptDetailsProps {
   concept: OntologyConcept;
   concepts: OntologyConcept[];
+  collections: KnowledgeCollection[];
   onSelectConcept: (concept: OntologyConcept) => void;
+  onEdit?: (concept: OntologyConcept) => void;
+  onDelete?: (concept: OntologyConcept) => void;
+  canEdit?: boolean;
 }
 
-const ConceptDetails: React.FC<ConceptDetailsProps> = ({ concept, concepts, onSelectConcept }) => {
+const ConceptDetails: React.FC<ConceptDetailsProps> = ({ 
+  concept, 
+  concepts, 
+  collections,
+  onSelectConcept,
+  onEdit,
+  onDelete,
+  canEdit = false,
+}) => {
   const { t } = useTranslation(['semantic-models', 'common']);
   const navigate = useNavigate();
+  
+  // Check if concept is from an editable collection
+  // Match by exact IRI or by source_context suffix (e.g., "test" matches "urn:glossary:test")
+  const conceptCollection = collections.find(c => 
+    c.iri === concept.source_context || 
+    c.iri.endsWith(`:${concept.source_context}`)
+  );
+  // Allow editing if status is draft or null/undefined (new concepts may not have status set)
+  const isDraftStatus = !concept.status || concept.status === 'draft';
+  const isEditable = canEdit && conceptCollection?.is_editable && isDraftStatus;
+  const canDelete = isEditable; // Only draft concepts can be deleted
   
   // Helper function to resolve IRI to concept label
   const getConceptLabel = (iri: string): string => {
@@ -491,7 +526,36 @@ const ConceptDetails: React.FC<ConceptDetailsProps> = ({ concept, concepts, onSe
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold">Details</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Details</h3>
+        {(isEditable || canDelete) && (
+          <div className="flex items-center gap-2">
+            {isEditable && onEdit && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onEdit(concept)}
+                title={t('common:actions.edit')}
+              >
+                <Pencil className="h-4 w-4 mr-1" />
+                {t('common:actions.edit')}
+              </Button>
+            )}
+            {canDelete && onDelete && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onDelete(concept)}
+                className="text-destructive hover:text-destructive"
+                title={t('common:actions.delete')}
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                {t('common:actions.delete')}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
       
       <DetailItem 
         label="IRI" 
@@ -1849,6 +1913,52 @@ export default function SemanticModelsView() {
     setConceptEditorOpen(true);
   };
 
+  // Delete confirmation state
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [conceptToDelete, setConceptToDelete] = useState<OntologyConcept | null>(null);
+
+  const handleDeleteConcept = (concept: OntologyConcept) => {
+    setConceptToDelete(concept);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteConcept = async () => {
+    if (!conceptToDelete) return;
+    
+    try {
+      const response = await fetch(
+        `/api/knowledge/concepts/${encodeURIComponent(conceptToDelete.iri)}`,
+        { method: 'DELETE' }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to delete concept');
+      }
+
+      toast({
+        title: t('common:toast.success'),
+        description: t('semantic-models:messages.conceptDeleted'),
+      });
+
+      // Clear selection if we deleted the selected concept
+      if (selectedConcept?.iri === conceptToDelete.iri) {
+        setSelectedConcept(null);
+      }
+
+      await fetchData();
+    } catch (error: any) {
+      toast({
+        title: t('common:toast.error'),
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleteConfirmOpen(false);
+      setConceptToDelete(null);
+    }
+  };
+
   const handleSaveConcept = async (
     data: ConceptCreate | ConceptUpdate,
     isNew: boolean
@@ -2339,7 +2449,11 @@ export default function SemanticModelsView() {
                   <ConceptDetails 
                     concept={selectedConcept} 
                     concepts={[...Object.values(groupedConcepts).flat(), ...Object.values(groupedProperties).flat()]}
+                    collections={knowledgeCollections}
                     onSelectConcept={handleSelectConcept}
+                    onEdit={canWrite ? handleEditConcept : undefined}
+                    onDelete={canWrite ? handleDeleteConcept : undefined}
+                    canEdit={canWrite}
                   />
                 </div>
 
@@ -2501,6 +2615,29 @@ export default function SemanticModelsView() {
           onMigrate={handleConfirmMigrate}
         />
       )}
+
+      {/* Delete Concept Confirmation Dialog */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('semantic-models:dialogs.deleteConcept.title')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('semantic-models:dialogs.deleteConcept.description', { 
+                label: conceptToDelete?.label || conceptToDelete?.iri 
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common:actions.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteConcept}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {t('common:actions.delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
