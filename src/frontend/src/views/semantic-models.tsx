@@ -6,7 +6,12 @@ import type {
   OntologyConcept, 
   ConceptHierarchy, 
   GroupedConcepts,
-  TaxonomyStats
+  TaxonomyStats,
+  KnowledgeCollection,
+  ConceptCreate,
+  ConceptUpdate,
+  KnowledgeCollectionCreate,
+  KnowledgeCollectionUpdate,
 } from '@/types/ontology';
 import type { EntitySemanticLink } from '@/types/semantic-link';
 import { useTree } from '@headless-tree/react';
@@ -46,6 +51,12 @@ import {
 import ReactFlow, { Node, Edge, Background, MarkerType, Controls, ConnectionMode } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { KnowledgeGraph } from '@/components/semantic-models/knowledge-graph';
+import {
+  CollectionTree,
+  CollectionEditorDialog,
+  ConceptEditorDialog,
+  PromotionDialog,
+} from '@/components/knowledge';
 import useBreadcrumbStore from '@/stores/breadcrumb-store';
 import { useGlossaryPreferencesStore } from '@/stores/glossary-preferences-store';
 import { usePermissions } from '@/stores/permissions-store';
@@ -787,7 +798,19 @@ export default function SemanticModelsView() {
   const [selectedEntityId, setSelectedEntityId] = useState<string>('');
   const [availableEntities, setAvailableEntities] = useState<any[]>([]);
 
-  // Legacy form state removed - Phase 0 (read-only ontologies)
+  // Knowledge Collection state
+  const [knowledgeCollections, setKnowledgeCollections] = useState<KnowledgeCollection[]>([]);
+  const [selectedCollection, setSelectedCollection] = useState<KnowledgeCollection | null>(null);
+  const [collectionEditorOpen, setCollectionEditorOpen] = useState(false);
+  const [editingCollection, setEditingCollection] = useState<KnowledgeCollection | null>(null);
+  
+  // Concept Editor state
+  const [conceptEditorOpen, setConceptEditorOpen] = useState(false);
+  const [editingConcept, setEditingConcept] = useState<OntologyConcept | null>(null);
+  
+  // Promotion Dialog state
+  const [promotionDialogOpen, setPromotionDialogOpen] = useState(false);
+  const [promotingConcept, setPromotingConcept] = useState<OntologyConcept | null>(null);
 
   const setStaticSegments = useBreadcrumbStore((state) => state.setStaticSegments);
   const setDynamicTitle = useBreadcrumbStore((state) => state.setDynamicTitle);
@@ -897,24 +920,27 @@ export default function SemanticModelsView() {
       setLoading(true);
 
       // Fetch all data in parallel for better performance
-      const [taxonomiesResponse, conceptsResponse, statsResponse] = await Promise.all([
+      const [taxonomiesResponse, conceptsResponse, statsResponse, collectionsResponse] = await Promise.all([
         fetch('/api/semantic-models'),
         fetch('/api/semantic-models/concepts-grouped'),
         fetch('/api/semantic-models/stats'),
+        fetch('/api/knowledge/collections?hierarchical=true'),
       ]);
 
       if (!taxonomiesResponse.ok) throw new Error('Failed to fetch taxonomies');
       if (!conceptsResponse.ok) throw new Error('Failed to fetch concepts');
 
-      const [taxonomiesData, conceptsData, statsData] = await Promise.all([
+      const [taxonomiesData, conceptsData, statsData, collectionsData] = await Promise.all([
         taxonomiesResponse.json(),
         conceptsResponse.json(),
         statsResponse.ok ? statsResponse.json() : Promise.resolve({ stats: null }),
+        collectionsResponse.ok ? collectionsResponse.json() : Promise.resolve({ collections: [] }),
       ]);
 
       setTaxonomies(taxonomiesData.taxonomies || []);
       setGroupedConcepts(conceptsData.grouped_concepts || {});
       setStats(statsData.stats);
+      setKnowledgeCollections(collectionsData.collections || []);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
@@ -1696,7 +1722,290 @@ export default function SemanticModelsView() {
     );
   };
 
-  // Legacy create handlers removed - Phase 0 (read-only ontologies)
+  // ============================================================================
+  // KNOWLEDGE COLLECTION HANDLERS
+  // ============================================================================
+
+  const handleCreateCollection = () => {
+    setEditingCollection(null);
+    setCollectionEditorOpen(true);
+  };
+
+  const handleEditCollection = (collection: KnowledgeCollection) => {
+    setEditingCollection(collection);
+    setCollectionEditorOpen(true);
+  };
+
+  const handleSaveCollection = async (
+    data: KnowledgeCollectionCreate | KnowledgeCollectionUpdate,
+    isNew: boolean
+  ) => {
+    try {
+      const url = isNew
+        ? '/api/knowledge/collections'
+        : `/api/knowledge/collections/${encodeURIComponent(editingCollection!.iri)}`;
+      const method = isNew ? 'POST' : 'PATCH';
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to save collection');
+      }
+
+      toast({
+        title: t('common:toast.success'),
+        description: isNew
+          ? t('semantic-models:messages.collectionCreated')
+          : t('semantic-models:messages.collectionUpdated'),
+      });
+
+      await fetchData();
+    } catch (error: any) {
+      toast({
+        title: t('common:toast.error'),
+        description: error.message,
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
+  const handleDeleteCollection = async (collection: KnowledgeCollection) => {
+    if (!confirm(t('semantic-models:messages.confirmDeleteCollection', { name: collection.label }))) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/knowledge/collections/${encodeURIComponent(collection.iri)}`,
+        { method: 'DELETE' }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to delete collection');
+      }
+
+      toast({
+        title: t('common:toast.success'),
+        description: t('semantic-models:messages.collectionDeleted'),
+      });
+
+      if (selectedCollection?.iri === collection.iri) {
+        setSelectedCollection(null);
+      }
+      await fetchData();
+    } catch (error: any) {
+      toast({
+        title: t('common:toast.error'),
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleExportCollection = async (collection: KnowledgeCollection) => {
+    try {
+      const response = await fetch(
+        `/api/knowledge/collections/${encodeURIComponent(collection.iri)}/export?format=turtle`
+      );
+      if (!response.ok) throw new Error('Export failed');
+
+      const content = await response.text();
+      const blob = new Blob([content], { type: 'text/turtle' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${collection.label.toLowerCase().replace(/\s+/g, '-')}.ttl`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      toast({
+        title: t('common:toast.error'),
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // ============================================================================
+  // CONCEPT HANDLERS
+  // ============================================================================
+
+  const handleCreateConcept = () => {
+    setEditingConcept(null);
+    setConceptEditorOpen(true);
+  };
+
+  const handleEditConcept = (concept: OntologyConcept) => {
+    setEditingConcept(concept);
+    setConceptEditorOpen(true);
+  };
+
+  const handleSaveConcept = async (
+    data: ConceptCreate | ConceptUpdate,
+    isNew: boolean
+  ) => {
+    try {
+      const url = isNew
+        ? '/api/knowledge/concepts'
+        : `/api/knowledge/concepts/${encodeURIComponent(editingConcept!.iri)}`;
+      const method = isNew ? 'POST' : 'PATCH';
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to save concept');
+      }
+
+      toast({
+        title: t('common:toast.success'),
+        description: isNew
+          ? t('semantic-models:messages.conceptCreated')
+          : t('semantic-models:messages.conceptUpdated'),
+      });
+
+      await fetchData();
+    } catch (error: any) {
+      toast({
+        title: t('common:toast.error'),
+        description: error.message,
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
+  const handleSubmitConceptForReview = async (concept: OntologyConcept) => {
+    // Show a simple prompt for reviewer email
+    const reviewerEmail = prompt(t('semantic-models:messages.enterReviewerEmail'));
+    if (!reviewerEmail) return;
+
+    try {
+      const response = await fetch(
+        `/api/knowledge/concepts/${encodeURIComponent(concept.iri)}/submit-review`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reviewer_email: reviewerEmail }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to submit for review');
+      }
+
+      toast({
+        title: t('common:toast.success'),
+        description: t('semantic-models:messages.submittedForReview'),
+      });
+
+      await fetchData();
+      setConceptEditorOpen(false);
+    } catch (error: any) {
+      toast({
+        title: t('common:toast.error'),
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handlePromoteConcept = (concept: OntologyConcept) => {
+    setPromotingConcept(concept);
+    setPromotionDialogOpen(true);
+  };
+
+  const handleConfirmPromote = async (
+    concept: OntologyConcept,
+    targetCollectionIri: string,
+    deprecateSource: boolean
+  ) => {
+    try {
+      const response = await fetch(
+        `/api/knowledge/concepts/${encodeURIComponent(concept.iri)}/promote`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            target_collection_iri: targetCollectionIri,
+            deprecate_source: deprecateSource,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to promote concept');
+      }
+
+      toast({
+        title: t('common:toast.success'),
+        description: t('semantic-models:messages.conceptPromoted'),
+      });
+
+      await fetchData();
+    } catch (error: any) {
+      toast({
+        title: t('common:toast.error'),
+        description: error.message,
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
+  const handleConfirmMigrate = async (
+    concept: OntologyConcept,
+    targetCollectionIri: string,
+    deleteSource: boolean
+  ) => {
+    try {
+      const response = await fetch(
+        `/api/knowledge/concepts/${encodeURIComponent(concept.iri)}/migrate`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            target_collection_iri: targetCollectionIri,
+            delete_source: deleteSource,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to migrate concept');
+      }
+
+      toast({
+        title: t('common:toast.success'),
+        description: t('semantic-models:messages.conceptMigrated'),
+      });
+
+      await fetchData();
+    } catch (error: any) {
+      toast({
+        title: t('common:toast.error'),
+        description: error.message,
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
 
   // Removed early return to keep header visible while loading
 
@@ -1711,6 +2020,12 @@ export default function SemanticModelsView() {
             <div className="text-sm text-muted-foreground">
               {stats.taxonomies.length} models / {stats.total_concepts + stats.total_properties} terms
             </div>
+          )}
+          {canWrite && (
+            <Button onClick={handleCreateConcept} size="sm">
+              <Layers className="h-4 w-4 mr-2" />
+              {t('semantic-models:actions.createConcept')}
+            </Button>
           )}
         </div>
       </div>
@@ -1784,6 +2099,51 @@ export default function SemanticModelsView() {
             </div>
           </div>
           
+          {/* Knowledge Collections - Only show when NOT grouping by source (to avoid duplication) */}
+          {knowledgeCollections.length > 0 && !groupBySource && (
+            <Collapsible
+              open={true}
+              className="border-b"
+            >
+              <div className="px-4 py-2 flex items-center justify-between">
+                <CollapsibleTrigger asChild>
+                  <button className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors">
+                    <ChevronDown className="h-4 w-4" />
+                    <FolderTree className="h-4 w-4" />
+                    {t('semantic-models:collections.title')}
+                    <Badge variant="secondary" className="h-5 text-[10px] px-1.5">
+                      {knowledgeCollections.length}
+                    </Badge>
+                  </button>
+                </CollapsibleTrigger>
+                {canWrite && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    onClick={handleCreateCollection}
+                    title={t('semantic-models:actions.createCollection')}
+                  >
+                    <span className="text-lg">+</span>
+                  </Button>
+                )}
+              </div>
+              <CollapsibleContent>
+                <div className="max-h-48 overflow-auto">
+                  <CollectionTree
+                    collections={knowledgeCollections}
+                    selectedCollection={selectedCollection?.iri}
+                    onSelectCollection={(coll) => setSelectedCollection(coll)}
+                    onEditCollection={canWrite ? handleEditCollection : undefined}
+                    onDeleteCollection={canWrite ? handleDeleteCollection : undefined}
+                    onExportCollection={handleExportCollection}
+                    canEdit={canWrite}
+                  />
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
           {/* Filter by Source - Collapsible */}
           {availableSources.length > 0 && (
             <Collapsible
@@ -2101,6 +2461,46 @@ export default function SemanticModelsView() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Knowledge Collection Editor Dialog */}
+      <CollectionEditorDialog
+        open={collectionEditorOpen}
+        onOpenChange={setCollectionEditorOpen}
+        collection={editingCollection}
+        collections={knowledgeCollections}
+        onSave={handleSaveCollection}
+      />
+
+      {/* Concept Editor Dialog */}
+      <ConceptEditorDialog
+        open={conceptEditorOpen}
+        onOpenChange={setConceptEditorOpen}
+        concept={editingConcept}
+        collection={selectedCollection || undefined}
+        collections={knowledgeCollections}
+        onSave={handleSaveConcept}
+        onSubmitForReview={handleSubmitConceptForReview}
+        onPromote={handlePromoteConcept}
+        readOnly={!canWrite}
+      />
+
+      {/* Promotion/Migration Dialog */}
+      {promotingConcept && (
+        <PromotionDialog
+          open={promotionDialogOpen}
+          onOpenChange={(open) => {
+            setPromotionDialogOpen(open);
+            if (!open) setPromotingConcept(null);
+          }}
+          concept={promotingConcept}
+          collections={knowledgeCollections}
+          currentCollection={knowledgeCollections.find(
+            (c) => c.iri === promotingConcept.source_context
+          )}
+          onPromote={handleConfirmPromote}
+          onMigrate={handleConfirmMigrate}
+        />
+      )}
     </div>
   );
 }

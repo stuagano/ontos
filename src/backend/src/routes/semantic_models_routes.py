@@ -712,6 +712,521 @@ async def sparql_query(
 
 """Legacy Business Glossary endpoints removed during rename to Semantic Models."""
 
+# ============================================================================
+# KNOWLEDGE COLLECTION ENDPOINTS
+# ============================================================================
+
+@router.get('/knowledge/collections')
+async def get_knowledge_collections(
+    hierarchical: bool = Query(False, description="Return nested hierarchy instead of flat list"),
+    manager: SemanticModelsManager = Depends(get_semantic_models_manager),
+    _: bool = Depends(PermissionChecker('semantic-models', FeatureAccessLevel.READ_ONLY))
+) -> dict:
+    """Get all knowledge collections (glossaries, taxonomies, ontologies)."""
+    try:
+        if hierarchical:
+            collections = manager.get_collections_with_hierarchy()
+        else:
+            collections = manager.get_collections()
+        return {'collections': collections}
+    except Exception as e:
+        logger.error(f"Error retrieving collections: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve collections")
+
+
+@router.get('/knowledge/collections/{collection_iri:path}')
+async def get_knowledge_collection(
+    collection_iri: str,
+    manager: SemanticModelsManager = Depends(get_semantic_models_manager),
+    _: bool = Depends(PermissionChecker('semantic-models', FeatureAccessLevel.READ_ONLY))
+) -> dict:
+    """Get a single knowledge collection by IRI."""
+    collection = manager.get_collection(collection_iri)
+    if not collection:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {collection_iri}")
+    return collection
+
+
+@router.post('/knowledge/collections')
+async def create_knowledge_collection(
+    request: Request,
+    current_user: CurrentUserDep,
+    manager: SemanticModelsManager = Depends(get_semantic_models_manager),
+    _: bool = Depends(PermissionChecker('semantic-models', FeatureAccessLevel.READ_WRITE))
+) -> dict:
+    """Create a new knowledge collection."""
+    try:
+        data = await request.json()
+        collection = manager.create_collection(
+            label=data.get('label'),
+            collection_type=data.get('collection_type', 'glossary'),
+            scope_level=data.get('scope_level', 'enterprise'),
+            description=data.get('description'),
+            parent_collection_iri=data.get('parent_collection_iri'),
+            is_editable=data.get('is_editable', True),
+            created_by=current_user.email,
+        )
+        return collection
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error creating collection: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to create collection")
+
+
+@router.patch('/knowledge/collections/{collection_iri:path}')
+async def update_knowledge_collection(
+    collection_iri: str,
+    request: Request,
+    current_user: CurrentUserDep,
+    manager: SemanticModelsManager = Depends(get_semantic_models_manager),
+    _: bool = Depends(PermissionChecker('semantic-models', FeatureAccessLevel.READ_WRITE))
+) -> dict:
+    """Update a knowledge collection."""
+    try:
+        data = await request.json()
+        collection = manager.update_collection(
+            collection_iri=collection_iri,
+            label=data.get('label'),
+            description=data.get('description'),
+            scope_level=data.get('scope_level'),
+            parent_collection_iri=data.get('parent_collection_iri'),
+            is_editable=data.get('is_editable'),
+            updated_by=current_user.email,
+        )
+        if not collection:
+            raise HTTPException(status_code=404, detail=f"Collection not found: {collection_iri}")
+        return collection
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error updating collection: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to update collection")
+
+
+@router.delete('/knowledge/collections/{collection_iri:path}')
+async def delete_knowledge_collection(
+    collection_iri: str,
+    current_user: CurrentUserDep,
+    manager: SemanticModelsManager = Depends(get_semantic_models_manager),
+    _: bool = Depends(PermissionChecker('semantic-models', FeatureAccessLevel.READ_WRITE))
+) -> dict:
+    """Delete a knowledge collection."""
+    try:
+        success = manager.delete_collection(collection_iri, current_user.email)
+        if not success:
+            raise HTTPException(status_code=404, detail=f"Collection not found: {collection_iri}")
+        return {'success': True, 'message': f"Collection deleted: {collection_iri}"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error deleting collection: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to delete collection")
+
+
+@router.get('/knowledge/collections/{collection_iri:path}/export')
+async def export_knowledge_collection(
+    collection_iri: str,
+    format: str = Query("turtle", description="Export format: turtle or rdfxml"),
+    manager: SemanticModelsManager = Depends(get_semantic_models_manager),
+    _: bool = Depends(PermissionChecker('semantic-models', FeatureAccessLevel.READ_ONLY))
+):
+    """Export a collection as Turtle or RDF/XML."""
+    from fastapi.responses import Response
+    try:
+        if format.lower() in ("turtle", "ttl"):
+            content = manager.export_collection_as_turtle(collection_iri)
+            media_type = "text/turtle"
+            filename = f"{collection_iri.split(':')[-1]}.ttl"
+        else:
+            content = manager.export_collection_as_rdfxml(collection_iri)
+            media_type = "application/rdf+xml"
+            filename = f"{collection_iri.split(':')[-1]}.rdf"
+        
+        return Response(
+            content=content,
+            media_type=media_type,
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error exporting collection: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to export collection")
+
+
+@router.post('/knowledge/collections/{collection_iri:path}/import')
+async def import_to_knowledge_collection(
+    collection_iri: str,
+    file: UploadFile = File(...),
+    current_user: CurrentUserDep = None,
+    manager: SemanticModelsManager = Depends(get_semantic_models_manager),
+    _: bool = Depends(PermissionChecker('semantic-models', FeatureAccessLevel.READ_WRITE))
+) -> dict:
+    """Import RDF content into an existing collection."""
+    try:
+        content = await file.read()
+        content_str = content.decode('utf-8')
+        
+        # Determine format from filename
+        format = "turtle" if file.filename and file.filename.endswith('.ttl') else "xml"
+        
+        count = manager.import_rdf_to_collection(
+            collection_iri=collection_iri,
+            content=content_str,
+            format=format,
+            imported_by=current_user.email if current_user else None,
+        )
+        return {'success': True, 'triples_imported': count}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error importing to collection: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to import content")
+
+
+# ============================================================================
+# CONCEPT CRUD ENDPOINTS
+# ============================================================================
+
+@router.get('/knowledge/concepts/{concept_iri:path}')
+async def get_concept(
+    concept_iri: str,
+    manager: SemanticModelsManager = Depends(get_semantic_models_manager),
+    _: bool = Depends(PermissionChecker('semantic-models', FeatureAccessLevel.READ_ONLY))
+) -> dict:
+    """Get a concept by IRI with all properties and governance info."""
+    concept = manager.get_concept(concept_iri)
+    if not concept:
+        raise HTTPException(status_code=404, detail=f"Concept not found: {concept_iri}")
+    return concept
+
+
+@router.post('/knowledge/concepts')
+async def create_concept(
+    request: Request,
+    current_user: CurrentUserDep,
+    manager: SemanticModelsManager = Depends(get_semantic_models_manager),
+    _: bool = Depends(PermissionChecker('semantic-models', FeatureAccessLevel.READ_WRITE))
+) -> dict:
+    """Create a new concept in a collection."""
+    try:
+        data = await request.json()
+        concept = manager.create_concept(
+            collection_iri=data.get('collection_iri'),
+            label=data.get('label'),
+            definition=data.get('definition'),
+            concept_type=data.get('concept_type', 'concept'),
+            synonyms=data.get('synonyms', []),
+            examples=data.get('examples', []),
+            broader_iris=data.get('broader_iris', []),
+            narrower_iris=data.get('narrower_iris', []),
+            related_iris=data.get('related_iris', []),
+            owners=data.get('owners', []),
+            created_by=current_user.email,
+        )
+        return concept
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error creating concept: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to create concept")
+
+
+@router.patch('/knowledge/concepts/{concept_iri:path}')
+async def update_concept(
+    concept_iri: str,
+    request: Request,
+    current_user: CurrentUserDep,
+    manager: SemanticModelsManager = Depends(get_semantic_models_manager),
+    _: bool = Depends(PermissionChecker('semantic-models', FeatureAccessLevel.READ_WRITE))
+) -> dict:
+    """Update a concept's properties."""
+    try:
+        data = await request.json()
+        concept = manager.update_concept(
+            concept_iri=concept_iri,
+            label=data.get('label'),
+            definition=data.get('definition'),
+            synonyms=data.get('synonyms'),
+            examples=data.get('examples'),
+            broader_iris=data.get('broader_iris'),
+            narrower_iris=data.get('narrower_iris'),
+            related_iris=data.get('related_iris'),
+            updated_by=current_user.email,
+        )
+        if not concept:
+            raise HTTPException(status_code=404, detail=f"Concept not found: {concept_iri}")
+        return concept
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error updating concept: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to update concept")
+
+
+@router.delete('/knowledge/concepts/{concept_iri:path}')
+async def delete_concept(
+    concept_iri: str,
+    current_user: CurrentUserDep,
+    manager: SemanticModelsManager = Depends(get_semantic_models_manager),
+    _: bool = Depends(PermissionChecker('semantic-models', FeatureAccessLevel.READ_WRITE))
+) -> dict:
+    """Delete a concept (draft status only)."""
+    try:
+        success = manager.delete_concept(concept_iri, current_user.email)
+        if not success:
+            raise HTTPException(status_code=404, detail=f"Concept not found: {concept_iri}")
+        return {'success': True, 'message': f"Concept deleted: {concept_iri}"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error deleting concept: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to delete concept")
+
+
+# ============================================================================
+# OWNERSHIP ENDPOINTS
+# ============================================================================
+
+@router.post('/knowledge/concepts/{concept_iri:path}/owners')
+async def add_concept_owner(
+    concept_iri: str,
+    request: Request,
+    current_user: CurrentUserDep,
+    manager: SemanticModelsManager = Depends(get_semantic_models_manager),
+    _: bool = Depends(PermissionChecker('semantic-models', FeatureAccessLevel.READ_WRITE))
+) -> dict:
+    """Add an owner to a concept."""
+    try:
+        data = await request.json()
+        concept = manager.add_concept_owner(
+            concept_iri=concept_iri,
+            user_email=data.get('user_email'),
+            role=data.get('role'),
+            assigned_by=current_user.email,
+        )
+        if not concept:
+            raise HTTPException(status_code=404, detail=f"Concept not found: {concept_iri}")
+        return concept
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error adding owner: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to add owner")
+
+
+@router.delete('/knowledge/concepts/{concept_iri:path}/owners/{user_email}')
+async def remove_concept_owner(
+    concept_iri: str,
+    user_email: str,
+    current_user: CurrentUserDep,
+    manager: SemanticModelsManager = Depends(get_semantic_models_manager),
+    _: bool = Depends(PermissionChecker('semantic-models', FeatureAccessLevel.READ_WRITE))
+) -> dict:
+    """Remove an owner from a concept."""
+    try:
+        concept = manager.remove_concept_owner(
+            concept_iri=concept_iri,
+            user_email=user_email,
+            removed_by=current_user.email,
+        )
+        if not concept:
+            raise HTTPException(status_code=404, detail=f"Concept not found: {concept_iri}")
+        return concept
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error removing owner: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to remove owner")
+
+
+# ============================================================================
+# LIFECYCLE / GOVERNANCE ENDPOINTS
+# ============================================================================
+
+@router.post('/knowledge/concepts/{concept_iri:path}/submit-review')
+async def submit_concept_for_review(
+    concept_iri: str,
+    request: Request,
+    current_user: CurrentUserDep,
+    manager: SemanticModelsManager = Depends(get_semantic_models_manager),
+    _: bool = Depends(PermissionChecker('semantic-models', FeatureAccessLevel.READ_WRITE))
+) -> dict:
+    """Submit a concept for review."""
+    try:
+        data = await request.json()
+        review_data = manager.submit_concept_for_review(
+            concept_iri=concept_iri,
+            reviewer_email=data.get('reviewer_email'),
+            submitted_by=current_user.email,
+            notes=data.get('notes'),
+        )
+        # TODO: Integrate with DataAssetReviewManager to create actual review request
+        # For now, update status directly
+        updated = manager.update_concept_status(
+            concept_iri=concept_iri,
+            new_status="under_review",
+            updated_by=current_user.email,
+        )
+        return {'review_data': review_data, 'concept': updated}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error submitting for review: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to submit for review")
+
+
+@router.post('/knowledge/concepts/{concept_iri:path}/publish')
+async def publish_concept(
+    concept_iri: str,
+    current_user: CurrentUserDep,
+    manager: SemanticModelsManager = Depends(get_semantic_models_manager),
+    _: bool = Depends(PermissionChecker('semantic-models', FeatureAccessLevel.READ_WRITE))
+) -> dict:
+    """Publish an approved concept."""
+    try:
+        concept = manager.update_concept_status(
+            concept_iri=concept_iri,
+            new_status="published",
+            updated_by=current_user.email,
+        )
+        if not concept:
+            raise HTTPException(status_code=404, detail=f"Concept not found: {concept_iri}")
+        return concept
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error publishing concept: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to publish concept")
+
+
+@router.post('/knowledge/concepts/{concept_iri:path}/certify')
+async def certify_concept(
+    concept_iri: str,
+    current_user: CurrentUserDep,
+    manager: SemanticModelsManager = Depends(get_semantic_models_manager),
+    _: bool = Depends(PermissionChecker('semantic-models', FeatureAccessLevel.ADMIN))
+) -> dict:
+    """Certify a published concept."""
+    try:
+        concept = manager.update_concept_status(
+            concept_iri=concept_iri,
+            new_status="certified",
+            updated_by=current_user.email,
+        )
+        if not concept:
+            raise HTTPException(status_code=404, detail=f"Concept not found: {concept_iri}")
+        return concept
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error certifying concept: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to certify concept")
+
+
+@router.post('/knowledge/concepts/{concept_iri:path}/deprecate')
+async def deprecate_concept(
+    concept_iri: str,
+    current_user: CurrentUserDep,
+    manager: SemanticModelsManager = Depends(get_semantic_models_manager),
+    _: bool = Depends(PermissionChecker('semantic-models', FeatureAccessLevel.READ_WRITE))
+) -> dict:
+    """Deprecate a concept."""
+    try:
+        concept = manager.update_concept_status(
+            concept_iri=concept_iri,
+            new_status="deprecated",
+            updated_by=current_user.email,
+        )
+        if not concept:
+            raise HTTPException(status_code=404, detail=f"Concept not found: {concept_iri}")
+        return concept
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error deprecating concept: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to deprecate concept")
+
+
+@router.post('/knowledge/concepts/{concept_iri:path}/archive')
+async def archive_concept(
+    concept_iri: str,
+    current_user: CurrentUserDep,
+    manager: SemanticModelsManager = Depends(get_semantic_models_manager),
+    _: bool = Depends(PermissionChecker('semantic-models', FeatureAccessLevel.READ_WRITE))
+) -> dict:
+    """Archive a deprecated concept."""
+    try:
+        concept = manager.update_concept_status(
+            concept_iri=concept_iri,
+            new_status="archived",
+            updated_by=current_user.email,
+        )
+        if not concept:
+            raise HTTPException(status_code=404, detail=f"Concept not found: {concept_iri}")
+        return concept
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error archiving concept: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to archive concept")
+
+
+# ============================================================================
+# PROMOTION / MIGRATION ENDPOINTS
+# ============================================================================
+
+@router.post('/knowledge/concepts/{concept_iri:path}/promote')
+async def promote_concept(
+    concept_iri: str,
+    request: Request,
+    current_user: CurrentUserDep,
+    manager: SemanticModelsManager = Depends(get_semantic_models_manager),
+    _: bool = Depends(PermissionChecker('semantic-models', FeatureAccessLevel.READ_WRITE))
+) -> dict:
+    """Promote a concept to a higher-scope collection."""
+    try:
+        data = await request.json()
+        concept = manager.promote_concept(
+            concept_iri=concept_iri,
+            target_collection_iri=data.get('target_collection_iri'),
+            deprecate_source=data.get('deprecate_source', True),
+            promoted_by=current_user.email,
+        )
+        return concept
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error promoting concept: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to promote concept")
+
+
+@router.post('/knowledge/concepts/{concept_iri:path}/migrate')
+async def migrate_concept(
+    concept_iri: str,
+    request: Request,
+    current_user: CurrentUserDep,
+    manager: SemanticModelsManager = Depends(get_semantic_models_manager),
+    _: bool = Depends(PermissionChecker('semantic-models', FeatureAccessLevel.READ_WRITE))
+) -> dict:
+    """Migrate a concept to a different collection."""
+    try:
+        data = await request.json()
+        concept = manager.migrate_concept(
+            concept_iri=concept_iri,
+            target_collection_iri=data.get('target_collection_iri'),
+            delete_source=data.get('delete_source', False),
+            migrated_by=current_user.email,
+        )
+        return concept
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error migrating concept: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to migrate concept")
+
+
 def register_routes(app):
     """Register routes with the app"""
     app.include_router(router)

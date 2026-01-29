@@ -187,6 +187,52 @@ class RdfTriplesRepository(CRUDBase[RdfTripleDb, dict, dict]):
             RdfTripleDb.subject_uri == subject_uri
         ).all()
 
+    def remove_by_subject(
+        self, db: Session, subject_uri: str, context_name: Optional[str] = None
+    ) -> int:
+        """Remove all triples with a given subject, optionally filtered by context.
+        
+        Returns the number of triples deleted.
+        """
+        query = db.query(RdfTripleDb).filter(
+            RdfTripleDb.subject_uri == subject_uri
+        )
+        if context_name:
+            query = query.filter(RdfTripleDb.context_name == context_name)
+        
+        deleted = query.delete(synchronize_session=False)
+        db.flush()
+        
+        logger.debug(f"Removed {deleted} triples with subject '{subject_uri}'")
+        return deleted
+
+    def remove_by_subject_predicate(
+        self,
+        db: Session,
+        subject_uri: str,
+        predicate_uri: str,
+        context_name: Optional[str] = None,
+    ) -> int:
+        """Remove all triples matching subject and predicate.
+        
+        Useful for updating properties where you don't know the old value.
+        Returns the number of triples deleted.
+        """
+        query = db.query(RdfTripleDb).filter(
+            and_(
+                RdfTripleDb.subject_uri == subject_uri,
+                RdfTripleDb.predicate_uri == predicate_uri,
+            )
+        )
+        if context_name:
+            query = query.filter(RdfTripleDb.context_name == context_name)
+        
+        deleted = query.delete(synchronize_session=False)
+        db.flush()
+        
+        logger.debug(f"Removed {deleted} triples for {subject_uri} -> {predicate_uri}")
+        return deleted
+
     def count_by_context(self, db: Session, context_name: str) -> int:
         """Count triples in a given context."""
         return db.query(RdfTripleDb).filter(

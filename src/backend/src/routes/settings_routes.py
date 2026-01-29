@@ -335,10 +335,10 @@ async def delete_role(
 @router.post("/settings/roles/handle-request", status_code=status.HTTP_200_OK)
 async def handle_role_request_decision(
     request: Request,
+    db: DBSessionDep,
+    audit_manager: AuditManagerDep,
+    current_user: AuditCurrentUserDep,
     request_data: HandleRoleRequest = Body(...),
-    db: Session = Depends(get_db),
-    audit_manager: AuditManagerDep = Depends(),
-    current_user: AuditCurrentUserDep = Depends(),
     settings_manager: SettingsManager = Depends(get_settings_manager),
     notifications_manager: NotificationsManager = Depends(get_notifications_manager),
     change_log_manager = Depends(get_change_log_manager)

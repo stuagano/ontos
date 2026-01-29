@@ -499,6 +499,112 @@ class SemanticModelsManager:
         except Exception as e:
             logger.warning(f"Failed to load database glossaries into graph: {e}")
 
+    def _register_sources_as_collections(self) -> None:
+        """Auto-register existing RDF sources as KnowledgeCollection entries.
+        
+        Scans all contexts in the in-memory graph and creates collection
+        metadata in urn:meta:sources for any that aren't already registered.
+        Imported sources are marked as non-editable by default.
+        """
+        from datetime import datetime
+        
+        META_CONTEXT = "urn:meta:sources"
+        now = datetime.utcnow().isoformat() + "Z"
+        
+        # Get or create meta context
+        meta_context = self._graph.get_context(URIRef(META_CONTEXT))
+        
+        # Find all existing collections
+        existing_collections = set()
+        for subj in meta_context.subjects(RDF.type, ONTOS.KnowledgeCollection):
+            existing_collections.add(str(subj))
+        
+        registered_count = 0
+        
+        # Scan all contexts and register missing ones
+        for context in self._graph.contexts():
+            context_name = str(context.identifier)
+            
+            # Skip system contexts
+            if context_name in ("urn:x-rdflib:default", META_CONTEXT, ""):
+                continue
+            
+            # Skip if already registered
+            if context_name in existing_collections:
+                continue
+            
+            # Infer collection type and label from context name
+            if context_name.startswith("urn:taxonomy:"):
+                coll_type = "taxonomy"
+                label = context_name.replace("urn:taxonomy:", "").replace("-", " ").replace("_", " ").title()
+            elif context_name.startswith("urn:glossary:"):
+                coll_type = "glossary"
+                label = context_name.replace("urn:glossary:", "").replace("-", " ").replace("_", " ").title()
+            elif context_name.startswith("urn:ontology:"):
+                coll_type = "ontology"
+                label = context_name.replace("urn:ontology:", "").replace("-", " ").replace("_", " ").title()
+            elif context_name.startswith("urn:semantic-model:"):
+                coll_type = "ontology"
+                label = context_name.replace("urn:semantic-model:", "").replace("-", " ").replace("_", " ").title()
+            else:
+                coll_type = "ontology"
+                # Extract label from last segment
+                label = context_name.split(":")[-1].replace("-", " ").replace("_", " ").title()
+            
+            # Count concepts in this context
+            concept_count = len(list(context.subjects(RDF.type, SKOS.Concept)))
+            if concept_count == 0:
+                # Also count RDFS classes
+                concept_count = len(list(context.subjects(RDF.type, RDFS.Class)))
+            
+            logger.debug(f"Auto-registering source as collection: {context_name} ({concept_count} concepts)")
+            
+            # Create collection metadata triples
+            coll_uri = URIRef(context_name)
+            
+            # Add to in-memory graph
+            meta_context.add((coll_uri, RDF.type, ONTOS.KnowledgeCollection))
+            meta_context.add((coll_uri, RDFS.label, Literal(label)))
+            meta_context.add((coll_uri, ONTOS.collectionType, Literal(coll_type)))
+            meta_context.add((coll_uri, ONTOS.scopeLevel, Literal("external")))
+            meta_context.add((coll_uri, ONTOS.sourceType, Literal("imported")))
+            meta_context.add((coll_uri, ONTOS.isEditable, Literal("false")))
+            meta_context.add((coll_uri, ONTOS.status, Literal("active")))
+            meta_context.add((coll_uri, ONTOS.createdAt, Literal(now, datatype=XSD.dateTime)))
+            meta_context.add((coll_uri, ONTOS.createdBy, URIRef("urn:user:system")))
+            
+            # Also persist to database
+            triples = [
+                (context_name, str(RDF.type), str(ONTOS.KnowledgeCollection), True),
+                (context_name, str(RDFS.label), label, False),
+                (context_name, str(ONTOS.collectionType), coll_type, False),
+                (context_name, str(ONTOS.scopeLevel), "external", False),
+                (context_name, str(ONTOS.sourceType), "imported", False),
+                (context_name, str(ONTOS.isEditable), "false", False),
+                (context_name, str(ONTOS.status), "active", False),
+                (context_name, str(ONTOS.createdAt), now, False),
+                (context_name, str(ONTOS.createdBy), "urn:user:system", True),
+            ]
+            
+            for subj, pred, obj, is_uri in triples:
+                rdf_triples_repo.add_triple(
+                    self._db,
+                    subject_uri=subj,
+                    predicate_uri=pred,
+                    object_value=obj,
+                    object_is_uri=is_uri,
+                    context_name=META_CONTEXT,
+                    source_type="collection",
+                    source_identifier=context_name,
+                    created_by="system",
+                )
+            
+            registered_count += 1
+        
+        if registered_count > 0:
+            self._db.commit()
+            logger.info(f"Auto-registered {registered_count} sources as collections")
+
     def rebuild_graph_from_enabled(self) -> None:
         """Rebuild the in-memory RDF graph from database and dynamic sources.
         
@@ -555,7 +661,13 @@ class SemanticModelsManager:
         # Step 5: Load database glossaries (dynamically computed)
         self._load_database_glossaries_into_graph()
         
-        # Step 6: Sync semantic links from entity_semantic_links table
+        # Step 6: Auto-register sources as KnowledgeCollections
+        try:
+            self._register_sources_as_collections()
+        except Exception as e:
+            logger.error(f"Failed to register sources as collections: {e}")
+        
+        # Step 7: Sync semantic links from entity_semantic_links table
         # This ensures any links that weren't properly dual-written to rdf_triples
         # are still present in the in-memory graph
         try:
@@ -780,9 +892,22 @@ class SemanticModelsManager:
             logger.error(f"Failed to rebuild RDF graph: {e}")
 
     def _invalidate_cache(self) -> None:
-        """Clear all cache entries"""
+        """Clear all cache entries (in-memory and persistent file cache)."""
         self._cache.clear()
-        logger.debug("Semantic models cache invalidated")
+        
+        # Also delete persistent cache files so they get rebuilt on next read
+        cache_dir = self._data_dir / "cache"
+        if cache_dir.exists():
+            for cache_file in ["concepts_all.json", "taxonomies.json", "stats.json"]:
+                cache_path = cache_dir / cache_file
+                if cache_path.exists():
+                    try:
+                        cache_path.unlink()
+                        logger.debug(f"Deleted persistent cache file: {cache_file}")
+                    except Exception as e:
+                        logger.warning(f"Failed to delete cache file {cache_file}: {e}")
+        
+        logger.info("Semantic models cache invalidated (in-memory and persistent)")
 
     def _get_cached(self, key: str) -> Optional[Any]:
         """Get cached value if still valid"""
@@ -1888,4 +2013,1384 @@ class SemanticModelsManager:
             grouped[source].sort(key=lambda p: (p.get("label") or p.get("iri")))
 
         return grouped
+
+    # ========================================================================
+    # KNOWLEDGE COLLECTION CRUD
+    # ========================================================================
+
+    def get_collections(self) -> List[Dict[str, Any]]:
+        """Get all knowledge collections with hierarchy information.
+        
+        Collections are stored as triples in the urn:meta:sources context.
+        Returns a flat list; use parent_collection_iri to build hierarchy.
+        """
+        from src.models.ontology import KnowledgeCollection, CollectionType, ScopeLevel, SourceType
+        
+        META_CONTEXT = "urn:meta:sources"
+        collections = []
+        
+        # Query all Collection instances from the meta context
+        try:
+            context = self._graph.get_context(URIRef(META_CONTEXT))
+            
+            # Find all subjects that are ontos:KnowledgeCollection
+            collection_iris = set()
+            for subj in context.subjects(RDF.type, ONTOS.KnowledgeCollection):
+                collection_iris.add(str(subj))
+            
+            for coll_iri in collection_iris:
+                coll_uri = URIRef(coll_iri)
+                
+                # Extract properties
+                label = self._get_literal(context, coll_uri, RDFS.label)
+                description = self._get_literal(context, coll_uri, RDFS.comment)
+                coll_type = self._get_literal(context, coll_uri, ONTOS.collectionType) or "glossary"
+                scope = self._get_literal(context, coll_uri, ONTOS.scopeLevel) or "enterprise"
+                source_type = self._get_literal(context, coll_uri, ONTOS.sourceType) or "custom"
+                source_url = self._get_literal(context, coll_uri, ONTOS.sourceUrl)
+                parent_iri = self._get_uri(context, coll_uri, ONTOS.parentCollection)
+                is_editable = self._get_literal(context, coll_uri, ONTOS.isEditable)
+                status = self._get_literal(context, coll_uri, ONTOS.status) or "active"
+                created_at = self._get_literal(context, coll_uri, ONTOS.createdAt)
+                created_by = self._get_uri(context, coll_uri, ONTOS.createdBy)
+                
+                # Count concepts in this collection's context
+                try:
+                    coll_context = self._graph.get_context(URIRef(coll_iri))
+                    concept_count = len(list(coll_context.subjects(RDF.type, SKOS.Concept)))
+                except:
+                    concept_count = 0
+                
+                collections.append({
+                    "iri": coll_iri,
+                    "label": label or coll_iri.split(":")[-1],
+                    "description": description,
+                    "collection_type": coll_type,
+                    "scope_level": scope,
+                    "source_type": source_type,
+                    "source_url": source_url,
+                    "parent_collection_iri": parent_iri,
+                    "is_editable": is_editable in ("true", "True", True, "1"),
+                    "status": status,
+                    "created_at": created_at,
+                    "created_by": created_by,
+                    "concept_count": concept_count,
+                })
+        except Exception as e:
+            logger.warning(f"Failed to query collections: {e}")
+        
+        # Sort by scope level and label
+        scope_order = {"enterprise": 0, "domain": 1, "department": 2, "team": 3, "project": 4, "external": 5}
+        collections.sort(key=lambda c: (scope_order.get(c.get("scope_level", ""), 99), c.get("label", "")))
+        
+        return collections
+
+    def get_collection(self, collection_iri: str) -> Optional[Dict[str, Any]]:
+        """Get a single collection by IRI."""
+        collections = self.get_collections()
+        for coll in collections:
+            if coll["iri"] == collection_iri:
+                return coll
+        return None
+
+    def create_collection(
+        self,
+        label: str,
+        collection_type: str = "glossary",
+        scope_level: str = "enterprise",
+        description: Optional[str] = None,
+        parent_collection_iri: Optional[str] = None,
+        is_editable: bool = True,
+        created_by: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a new knowledge collection.
+        
+        Creates triples in the urn:meta:sources context and an empty context
+        for the collection's concepts.
+        """
+        from datetime import datetime
+        
+        META_CONTEXT = "urn:meta:sources"
+        
+        # Generate IRI from label
+        sanitized = _sanitize_context_name(label.lower().replace(" ", "-"))
+        prefix = "urn:glossary:" if collection_type == "glossary" else \
+                 "urn:taxonomy:" if collection_type == "taxonomy" else "urn:ontology:"
+        collection_iri = f"{prefix}{sanitized}"
+        
+        # Check if already exists
+        existing = self.get_collection(collection_iri)
+        if existing:
+            raise ValueError(f"Collection already exists: {collection_iri}")
+        
+        # Create triples for the collection metadata
+        now = datetime.utcnow().isoformat() + "Z"
+        triples = [
+            (collection_iri, str(RDF.type), str(ONTOS.KnowledgeCollection), True),
+            (collection_iri, str(RDFS.label), label, False),
+            (collection_iri, str(ONTOS.collectionType), collection_type, False),
+            (collection_iri, str(ONTOS.scopeLevel), scope_level, False),
+            (collection_iri, str(ONTOS.sourceType), "custom", False),
+            (collection_iri, str(ONTOS.isEditable), str(is_editable).lower(), False),
+            (collection_iri, str(ONTOS.status), "active", False),
+            (collection_iri, str(ONTOS.createdAt), now, False),
+        ]
+        
+        if description:
+            triples.append((collection_iri, str(RDFS.comment), description, False))
+        if parent_collection_iri:
+            triples.append((collection_iri, str(ONTOS.parentCollection), parent_collection_iri, True))
+        if created_by:
+            user_uri = f"urn:user:{created_by}" if not created_by.startswith("urn:") else created_by
+            triples.append((collection_iri, str(ONTOS.createdBy), user_uri, True))
+        
+        # Add to database
+        for subj, pred, obj, is_uri in triples:
+            rdf_triples_repo.add_triple(
+                self._db,
+                subject_uri=subj,
+                predicate_uri=pred,
+                object_value=obj,
+                object_is_uri=is_uri,
+                context_name=META_CONTEXT,
+                source_type="collection",
+                source_identifier=collection_iri,
+                created_by=created_by,
+            )
+        
+        # Also add to in-memory graph
+        meta_context = self._graph.get_context(URIRef(META_CONTEXT))
+        coll_uri = URIRef(collection_iri)
+        meta_context.add((coll_uri, RDF.type, ONTOS.KnowledgeCollection))
+        meta_context.add((coll_uri, RDFS.label, Literal(label)))
+        meta_context.add((coll_uri, ONTOS.collectionType, Literal(collection_type)))
+        meta_context.add((coll_uri, ONTOS.scopeLevel, Literal(scope_level)))
+        meta_context.add((coll_uri, ONTOS.sourceType, Literal("custom")))
+        meta_context.add((coll_uri, ONTOS.isEditable, Literal(str(is_editable).lower())))
+        meta_context.add((coll_uri, ONTOS.status, Literal("active")))
+        meta_context.add((coll_uri, ONTOS.createdAt, Literal(now, datatype=XSD.dateTime)))
+        if description:
+            meta_context.add((coll_uri, RDFS.comment, Literal(description)))
+        if parent_collection_iri:
+            meta_context.add((coll_uri, ONTOS.parentCollection, URIRef(parent_collection_iri)))
+        if created_by:
+            user_uri = f"urn:user:{created_by}" if not created_by.startswith("urn:") else created_by
+            meta_context.add((coll_uri, ONTOS.createdBy, URIRef(user_uri)))
+        
+        self._db.commit()
+        self._invalidate_cache()
+        
+        return self.get_collection(collection_iri)
+
+    def update_collection(
+        self,
+        collection_iri: str,
+        label: Optional[str] = None,
+        description: Optional[str] = None,
+        scope_level: Optional[str] = None,
+        parent_collection_iri: Optional[str] = None,
+        is_editable: Optional[bool] = None,
+        updated_by: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Update a knowledge collection's metadata."""
+        from datetime import datetime
+        
+        META_CONTEXT = "urn:meta:sources"
+        
+        existing = self.get_collection(collection_iri)
+        if not existing:
+            return None
+        
+        coll_uri = URIRef(collection_iri)
+        meta_context = self._graph.get_context(URIRef(META_CONTEXT))
+        now = datetime.utcnow().isoformat() + "Z"
+        
+        updates = []
+        if label is not None:
+            # Remove old, add new
+            rdf_triples_repo.remove_by_subject_predicate(self._db, collection_iri, str(RDFS.label), META_CONTEXT)
+            updates.append((collection_iri, str(RDFS.label), label, False))
+            meta_context.remove((coll_uri, RDFS.label, None))
+            meta_context.add((coll_uri, RDFS.label, Literal(label)))
+        
+        if description is not None:
+            rdf_triples_repo.remove_by_subject_predicate(self._db, collection_iri, str(RDFS.comment), META_CONTEXT)
+            updates.append((collection_iri, str(RDFS.comment), description, False))
+            meta_context.remove((coll_uri, RDFS.comment, None))
+            meta_context.add((coll_uri, RDFS.comment, Literal(description)))
+        
+        if scope_level is not None:
+            rdf_triples_repo.remove_by_subject_predicate(self._db, collection_iri, str(ONTOS.scopeLevel), META_CONTEXT)
+            updates.append((collection_iri, str(ONTOS.scopeLevel), scope_level, False))
+            meta_context.remove((coll_uri, ONTOS.scopeLevel, None))
+            meta_context.add((coll_uri, ONTOS.scopeLevel, Literal(scope_level)))
+        
+        if parent_collection_iri is not None:
+            rdf_triples_repo.remove_by_subject_predicate(self._db, collection_iri, str(ONTOS.parentCollection), META_CONTEXT)
+            if parent_collection_iri:  # Empty string means remove parent
+                updates.append((collection_iri, str(ONTOS.parentCollection), parent_collection_iri, True))
+                meta_context.add((coll_uri, ONTOS.parentCollection, URIRef(parent_collection_iri)))
+            meta_context.remove((coll_uri, ONTOS.parentCollection, None))
+        
+        if is_editable is not None:
+            rdf_triples_repo.remove_by_subject_predicate(self._db, collection_iri, str(ONTOS.isEditable), META_CONTEXT)
+            updates.append((collection_iri, str(ONTOS.isEditable), str(is_editable).lower(), False))
+            meta_context.remove((coll_uri, ONTOS.isEditable, None))
+            meta_context.add((coll_uri, ONTOS.isEditable, Literal(str(is_editable).lower())))
+        
+        # Update timestamp
+        rdf_triples_repo.remove_by_subject_predicate(self._db, collection_iri, str(ONTOS.updatedAt), META_CONTEXT)
+        updates.append((collection_iri, str(ONTOS.updatedAt), now, False))
+        meta_context.remove((coll_uri, ONTOS.updatedAt, None))
+        meta_context.add((coll_uri, ONTOS.updatedAt, Literal(now, datatype=XSD.dateTime)))
+        
+        if updated_by:
+            user_uri = f"urn:user:{updated_by}" if not updated_by.startswith("urn:") else updated_by
+            rdf_triples_repo.remove_by_subject_predicate(self._db, collection_iri, str(ONTOS.updatedBy), META_CONTEXT)
+            updates.append((collection_iri, str(ONTOS.updatedBy), user_uri, True))
+            meta_context.remove((coll_uri, ONTOS.updatedBy, None))
+            meta_context.add((coll_uri, ONTOS.updatedBy, URIRef(user_uri)))
+        
+        # Add new triples to database
+        for subj, pred, obj, is_uri in updates:
+            rdf_triples_repo.add_triple(
+                self._db,
+                subject_uri=subj,
+                predicate_uri=pred,
+                object_value=obj,
+                object_is_uri=is_uri,
+                context_name=META_CONTEXT,
+                source_type="collection",
+                source_identifier=collection_iri,
+                created_by=updated_by,
+            )
+        
+        self._db.commit()
+        self._invalidate_cache()
+        
+        return self.get_collection(collection_iri)
+
+    def delete_collection(self, collection_iri: str, deleted_by: Optional[str] = None) -> bool:
+        """Delete a knowledge collection and all its concepts.
+        
+        Only custom collections can be deleted. Imported collections should be
+        disabled instead.
+        """
+        META_CONTEXT = "urn:meta:sources"
+        
+        existing = self.get_collection(collection_iri)
+        if not existing:
+            return False
+        
+        if existing.get("source_type") == "imported":
+            raise ValueError("Cannot delete imported collections. Disable editing instead.")
+        
+        # Remove collection metadata from meta context
+        rdf_triples_repo.remove_by_subject(self._db, collection_iri, META_CONTEXT)
+        
+        # Remove all concepts in the collection's context
+        rdf_triples_repo.remove_by_context(self._db, collection_iri)
+        
+        # Remove from in-memory graph
+        meta_context = self._graph.get_context(URIRef(META_CONTEXT))
+        coll_uri = URIRef(collection_iri)
+        for triple in list(meta_context.triples((coll_uri, None, None))):
+            meta_context.remove(triple)
+        
+        # Remove the collection's context from in-memory graph
+        try:
+            coll_context = self._graph.get_context(URIRef(collection_iri))
+            self._graph.remove_context(coll_context)
+        except:
+            pass
+        
+        self._db.commit()
+        self._invalidate_cache()
+        
+        return True
+
+    # ========================================================================
+    # CONCEPT CRUD
+    # ========================================================================
+
+    def create_concept(
+        self,
+        collection_iri: str,
+        label: str,
+        definition: Optional[str] = None,
+        concept_type: str = "concept",
+        synonyms: List[str] = None,
+        examples: List[str] = None,
+        broader_iris: List[str] = None,
+        narrower_iris: List[str] = None,
+        related_iris: List[str] = None,
+        owners: List[Dict[str, Any]] = None,
+        created_by: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a new concept in a collection.
+        
+        Creates SKOS-compatible triples in the collection's context.
+        New concepts start with status 'draft'.
+        
+        owners: List of dicts with keys: user_uri, role (e.g., business_owner, data_steward)
+        """
+        from datetime import datetime
+        
+        # Verify collection exists and is editable
+        collection = self.get_collection(collection_iri)
+        if not collection:
+            raise ValueError(f"Collection not found: {collection_iri}")
+        if not collection.get("is_editable"):
+            raise ValueError(f"Collection is not editable: {collection_iri}")
+        
+        # Generate concept IRI
+        sanitized = _sanitize_context_name(label.lower().replace(" ", "-"))
+        concept_iri = f"{collection_iri}/{sanitized}"
+        
+        # Check if already exists
+        existing = self.get_concept(concept_iri)
+        if existing:
+            raise ValueError(f"Concept already exists: {concept_iri}")
+        
+        now = datetime.utcnow().isoformat() + "Z"
+        synonyms = synonyms or []
+        examples = examples or []
+        broader_iris = broader_iris or []
+        narrower_iris = narrower_iris or []
+        related_iris = related_iris or []
+        owners = owners or []
+        
+        # Build triples
+        triples = [
+            (concept_iri, str(RDF.type), str(SKOS.Concept), True),
+            (concept_iri, str(SKOS.prefLabel), label, False),
+            (concept_iri, str(ONTOS.status), "draft", False),
+            (concept_iri, str(ONTOS.version), "1.0.0", False),
+            (concept_iri, str(ONTOS.createdAt), now, False),
+        ]
+        
+        if definition:
+            triples.append((concept_iri, str(SKOS.definition), definition, False))
+        
+        for syn in synonyms:
+            triples.append((concept_iri, str(SKOS.altLabel), syn, False))
+        
+        for ex in examples:
+            triples.append((concept_iri, str(SKOS.example), ex, False))
+        
+        for broader in broader_iris:
+            triples.append((concept_iri, str(SKOS.broader), broader, True))
+        
+        for narrower in narrower_iris:
+            triples.append((concept_iri, str(SKOS.narrower), narrower, True))
+        
+        for related in related_iris:
+            triples.append((concept_iri, str(SKOS.related), related, True))
+        
+        if created_by:
+            user_uri = f"urn:user:{created_by}" if not created_by.startswith("urn:") else created_by
+            triples.append((concept_iri, str(ONTOS.createdBy), user_uri, True))
+        
+        # Add to database
+        for subj, pred, obj, is_uri in triples:
+            rdf_triples_repo.add_triple(
+                self._db,
+                subject_uri=subj,
+                predicate_uri=pred,
+                object_value=obj,
+                object_is_uri=is_uri,
+                context_name=collection_iri,
+                source_type="concept",
+                source_identifier=concept_iri,
+                created_by=created_by,
+            )
+        
+        # Add to in-memory graph
+        coll_context = self._graph.get_context(URIRef(collection_iri))
+        concept_uri = URIRef(concept_iri)
+        coll_context.add((concept_uri, RDF.type, SKOS.Concept))
+        coll_context.add((concept_uri, SKOS.prefLabel, Literal(label)))
+        coll_context.add((concept_uri, ONTOS.status, Literal("draft")))
+        coll_context.add((concept_uri, ONTOS.version, Literal("1.0.0")))
+        coll_context.add((concept_uri, ONTOS.createdAt, Literal(now, datatype=XSD.dateTime)))
+        
+        if definition:
+            coll_context.add((concept_uri, SKOS.definition, Literal(definition)))
+        for syn in synonyms:
+            coll_context.add((concept_uri, SKOS.altLabel, Literal(syn)))
+        for ex in examples:
+            coll_context.add((concept_uri, SKOS.example, Literal(ex)))
+        for broader in broader_iris:
+            coll_context.add((concept_uri, SKOS.broader, URIRef(broader)))
+        for narrower in narrower_iris:
+            coll_context.add((concept_uri, SKOS.narrower, URIRef(narrower)))
+        for related in related_iris:
+            coll_context.add((concept_uri, SKOS.related, URIRef(related)))
+        if created_by:
+            user_uri = f"urn:user:{created_by}" if not created_by.startswith("urn:") else created_by
+            coll_context.add((concept_uri, ONTOS.createdBy, URIRef(user_uri)))
+        
+        self._db.commit()
+        
+        # Add owners if provided
+        for owner in owners:
+            owner_user = owner.get("user_uri", "")
+            owner_role = owner.get("role", "business_owner")
+            if owner_user:
+                # Normalize user URI
+                if not owner_user.startswith("urn:"):
+                    owner_user = f"urn:user:{owner_user}"
+                try:
+                    self.add_concept_owner(
+                        concept_iri=concept_iri,
+                        user_email=owner_user.replace("urn:user:", ""),
+                        role=owner_role,
+                        assigned_by=created_by,
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to add owner {owner_user} to concept: {e}")
+        
+        self._invalidate_cache()
+        
+        return self.get_concept(concept_iri)
+
+    def get_concept(self, concept_iri: str) -> Optional[Dict[str, Any]]:
+        """Get a concept by IRI with all its properties and governance info."""
+        concept_uri = URIRef(concept_iri)
+        
+        # Find which context contains this concept
+        for context in self._graph.contexts():
+            context_name = str(context.identifier)
+            if context_name == "urn:x-rdflib:default":
+                continue
+            
+            # Check if concept exists in this context
+            if (concept_uri, RDF.type, None) in context:
+                # Extract all properties
+                label = self._get_literal(context, concept_uri, SKOS.prefLabel)
+                if not label:
+                    label = self._get_literal(context, concept_uri, RDFS.label)
+                
+                definition = self._get_literal(context, concept_uri, SKOS.definition)
+                if not definition:
+                    definition = self._get_literal(context, concept_uri, RDFS.comment)
+                
+                # Determine concept type
+                concept_type = "concept"
+                for rdf_type in context.objects(concept_uri, RDF.type):
+                    type_str = str(rdf_type)
+                    if type_str == str(SKOS.Concept):
+                        concept_type = "concept"
+                    elif type_str == str(RDFS.Class) or type_str == str(OWL.Class):
+                        concept_type = "class"
+                    elif type_str == str(RDF.Property) or type_str == str(OWL.ObjectProperty):
+                        concept_type = "property"
+                
+                # Get synonyms and examples
+                synonyms = [str(s) for s in context.objects(concept_uri, SKOS.altLabel)]
+                examples = [str(e) for e in context.objects(concept_uri, SKOS.example)]
+                
+                # Get hierarchy
+                broader = [str(b) for b in context.objects(concept_uri, SKOS.broader)]
+                narrower = [str(n) for n in context.objects(concept_uri, SKOS.narrower)]
+                related = [str(r) for r in context.objects(concept_uri, SKOS.related)]
+                
+                # Also check rdfs:subClassOf for classes
+                for parent in context.objects(concept_uri, RDFS.subClassOf):
+                    parent_str = str(parent)
+                    if parent_str not in broader:
+                        broader.append(parent_str)
+                
+                # Get governance info
+                status = self._get_literal(context, concept_uri, ONTOS.status)
+                version = self._get_literal(context, concept_uri, ONTOS.version)
+                created_at = self._get_literal(context, concept_uri, ONTOS.createdAt)
+                created_by = self._get_uri(context, concept_uri, ONTOS.createdBy)
+                updated_at = self._get_literal(context, concept_uri, ONTOS.updatedAt)
+                updated_by = self._get_uri(context, concept_uri, ONTOS.updatedBy)
+                published_at = self._get_literal(context, concept_uri, ONTOS.publishedAt)
+                published_by = self._get_uri(context, concept_uri, ONTOS.publishedBy)
+                certified_at = self._get_literal(context, concept_uri, ONTOS.certifiedAt)
+                certified_by = self._get_uri(context, concept_uri, ONTOS.certifiedBy)
+                cert_expires = self._get_literal(context, concept_uri, ONTOS.certificationExpiresAt)
+                review_id = self._get_literal(context, concept_uri, ONTOS.reviewRequestId)
+                
+                # Get provenance
+                source_concept = self._get_uri(context, concept_uri, ONTOS.sourceConceptIri)
+                source_coll = self._get_uri(context, concept_uri, ONTOS.sourceCollectionIri)
+                promotion_type = self._get_literal(context, concept_uri, ONTOS.promotionType)
+                
+                # Get owners
+                owners = []
+                for owner_uri in context.objects(concept_uri, ONTOS.hasOwner):
+                    owner_user = self._get_uri(context, owner_uri, ONTOS.ownershipUser)
+                    owner_role = self._get_literal(context, owner_uri, ONTOS.ownershipRole)
+                    owner_assigned = self._get_literal(context, owner_uri, ONTOS.ownershipAssignedAt)
+                    owner_by = self._get_uri(context, owner_uri, ONTOS.ownershipAssignedBy)
+                    if owner_user and owner_role:
+                        owners.append({
+                            "user_uri": owner_user,
+                            "role": owner_role,
+                            "assigned_at": owner_assigned,
+                            "assigned_by": owner_by,
+                        })
+                
+                return {
+                    "iri": concept_iri,
+                    "label": label,
+                    "comment": definition,
+                    "concept_type": concept_type,
+                    "source_context": context_name,
+                    "parent_concepts": broader,
+                    "child_concepts": narrower,
+                    "related_concepts": related,
+                    "synonyms": synonyms,
+                    "examples": examples,
+                    "status": status,
+                    "version": version,
+                    "owners": owners,
+                    "created_at": created_at,
+                    "created_by": created_by,
+                    "updated_at": updated_at,
+                    "updated_by": updated_by,
+                    "published_at": published_at,
+                    "published_by": published_by,
+                    "certified_at": certified_at,
+                    "certified_by": certified_by,
+                    "certification_expires_at": cert_expires,
+                    "source_concept_iri": source_concept,
+                    "source_collection_iri": source_coll,
+                    "promotion_type": promotion_type,
+                    "review_request_id": review_id,
+                    "tagged_assets": [],
+                    "properties": [],
+                }
+        
+        return None
+
+    def update_concept(
+        self,
+        concept_iri: str,
+        label: Optional[str] = None,
+        definition: Optional[str] = None,
+        synonyms: Optional[List[str]] = None,
+        examples: Optional[List[str]] = None,
+        broader_iris: Optional[List[str]] = None,
+        narrower_iris: Optional[List[str]] = None,
+        related_iris: Optional[List[str]] = None,
+        updated_by: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Update a concept's properties.
+        
+        Only concepts with status 'draft' can be freely edited.
+        Published concepts require creating a new version.
+        """
+        from datetime import datetime
+        
+        existing = self.get_concept(concept_iri)
+        if not existing:
+            return None
+        
+        collection_iri = existing.get("source_context")
+        if not collection_iri:
+            raise ValueError("Cannot determine collection for concept")
+        
+        # Check if collection is editable
+        collection = self.get_collection(collection_iri)
+        if collection and not collection.get("is_editable"):
+            raise ValueError(f"Collection is not editable: {collection_iri}")
+        
+        # Check status - only draft can be freely edited
+        status = existing.get("status")
+        if status and status not in ("draft", None):
+            raise ValueError(f"Cannot edit concept with status '{status}'. Submit changes for review or create new version.")
+        
+        concept_uri = URIRef(concept_iri)
+        coll_context = self._graph.get_context(URIRef(collection_iri))
+        now = datetime.utcnow().isoformat() + "Z"
+        
+        updates = []
+        
+        if label is not None:
+            rdf_triples_repo.remove_by_subject_predicate(self._db, concept_iri, str(SKOS.prefLabel), collection_iri)
+            updates.append((concept_iri, str(SKOS.prefLabel), label, False))
+            coll_context.remove((concept_uri, SKOS.prefLabel, None))
+            coll_context.add((concept_uri, SKOS.prefLabel, Literal(label)))
+        
+        if definition is not None:
+            rdf_triples_repo.remove_by_subject_predicate(self._db, concept_iri, str(SKOS.definition), collection_iri)
+            updates.append((concept_iri, str(SKOS.definition), definition, False))
+            coll_context.remove((concept_uri, SKOS.definition, None))
+            coll_context.add((concept_uri, SKOS.definition, Literal(definition)))
+        
+        if synonyms is not None:
+            # Remove all existing synonyms
+            rdf_triples_repo.remove_by_subject_predicate(self._db, concept_iri, str(SKOS.altLabel), collection_iri)
+            coll_context.remove((concept_uri, SKOS.altLabel, None))
+            for syn in synonyms:
+                updates.append((concept_iri, str(SKOS.altLabel), syn, False))
+                coll_context.add((concept_uri, SKOS.altLabel, Literal(syn)))
+        
+        if examples is not None:
+            rdf_triples_repo.remove_by_subject_predicate(self._db, concept_iri, str(SKOS.example), collection_iri)
+            coll_context.remove((concept_uri, SKOS.example, None))
+            for ex in examples:
+                updates.append((concept_iri, str(SKOS.example), ex, False))
+                coll_context.add((concept_uri, SKOS.example, Literal(ex)))
+        
+        if broader_iris is not None:
+            rdf_triples_repo.remove_by_subject_predicate(self._db, concept_iri, str(SKOS.broader), collection_iri)
+            coll_context.remove((concept_uri, SKOS.broader, None))
+            for broader in broader_iris:
+                updates.append((concept_iri, str(SKOS.broader), broader, True))
+                coll_context.add((concept_uri, SKOS.broader, URIRef(broader)))
+        
+        if narrower_iris is not None:
+            rdf_triples_repo.remove_by_subject_predicate(self._db, concept_iri, str(SKOS.narrower), collection_iri)
+            coll_context.remove((concept_uri, SKOS.narrower, None))
+            for narrower in narrower_iris:
+                updates.append((concept_iri, str(SKOS.narrower), narrower, True))
+                coll_context.add((concept_uri, SKOS.narrower, URIRef(narrower)))
+        
+        if related_iris is not None:
+            rdf_triples_repo.remove_by_subject_predicate(self._db, concept_iri, str(SKOS.related), collection_iri)
+            coll_context.remove((concept_uri, SKOS.related, None))
+            for related in related_iris:
+                updates.append((concept_iri, str(SKOS.related), related, True))
+                coll_context.add((concept_uri, SKOS.related, URIRef(related)))
+        
+        # Update timestamp
+        rdf_triples_repo.remove_by_subject_predicate(self._db, concept_iri, str(ONTOS.updatedAt), collection_iri)
+        updates.append((concept_iri, str(ONTOS.updatedAt), now, False))
+        coll_context.remove((concept_uri, ONTOS.updatedAt, None))
+        coll_context.add((concept_uri, ONTOS.updatedAt, Literal(now, datatype=XSD.dateTime)))
+        
+        if updated_by:
+            user_uri = f"urn:user:{updated_by}" if not updated_by.startswith("urn:") else updated_by
+            rdf_triples_repo.remove_by_subject_predicate(self._db, concept_iri, str(ONTOS.updatedBy), collection_iri)
+            updates.append((concept_iri, str(ONTOS.updatedBy), user_uri, True))
+            coll_context.remove((concept_uri, ONTOS.updatedBy, None))
+            coll_context.add((concept_uri, ONTOS.updatedBy, URIRef(user_uri)))
+        
+        # Add to database
+        for subj, pred, obj, is_uri in updates:
+            rdf_triples_repo.add_triple(
+                self._db,
+                subject_uri=subj,
+                predicate_uri=pred,
+                object_value=obj,
+                object_is_uri=is_uri,
+                context_name=collection_iri,
+                source_type="concept",
+                source_identifier=concept_iri,
+                created_by=updated_by,
+            )
+        
+        self._db.commit()
+        self._invalidate_cache()
+        
+        return self.get_concept(concept_iri)
+
+    def delete_concept(self, concept_iri: str, deleted_by: Optional[str] = None) -> bool:
+        """Delete a concept.
+        
+        Only concepts with status 'draft' can be deleted.
+        Published concepts should be deprecated instead.
+        """
+        existing = self.get_concept(concept_iri)
+        if not existing:
+            return False
+        
+        collection_iri = existing.get("source_context")
+        if not collection_iri:
+            return False
+        
+        # Check if collection is editable
+        collection = self.get_collection(collection_iri)
+        if collection and not collection.get("is_editable"):
+            raise ValueError(f"Collection is not editable: {collection_iri}")
+        
+        # Check status - only draft can be deleted
+        status = existing.get("status")
+        if status and status not in ("draft", None):
+            raise ValueError(f"Cannot delete concept with status '{status}'. Deprecate it instead.")
+        
+        # Remove all triples for this concept
+        rdf_triples_repo.remove_by_subject(self._db, concept_iri, collection_iri)
+        
+        # Also remove any ownership records
+        for owner in existing.get("owners", []):
+            owner_iri = f"{concept_iri}/owner/{owner.get('user_uri', '').split(':')[-1]}"
+            rdf_triples_repo.remove_by_subject(self._db, owner_iri, collection_iri)
+        
+        # Remove from in-memory graph
+        concept_uri = URIRef(concept_iri)
+        coll_context = self._graph.get_context(URIRef(collection_iri))
+        for triple in list(coll_context.triples((concept_uri, None, None))):
+            coll_context.remove(triple)
+        
+        self._db.commit()
+        self._invalidate_cache()
+        
+        return True
+
+    # ========================================================================
+    # OWNERSHIP MANAGEMENT
+    # ========================================================================
+
+    def add_concept_owner(
+        self,
+        concept_iri: str,
+        user_email: str,
+        role: str,
+        assigned_by: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Add an owner to a concept using named reification pattern.
+        
+        Creates a named Ownership node linked to the concept.
+        """
+        from datetime import datetime
+        
+        existing = self.get_concept(concept_iri)
+        if not existing:
+            return None
+        
+        collection_iri = existing.get("source_context")
+        if not collection_iri:
+            raise ValueError("Cannot determine collection for concept")
+        
+        # Check if collection is editable
+        collection = self.get_collection(collection_iri)
+        if collection and not collection.get("is_editable"):
+            raise ValueError(f"Collection is not editable: {collection_iri}")
+        
+        # Generate ownership IRI
+        sanitized_email = _sanitize_context_name(user_email.replace("@", "_at_"))
+        ownership_iri = f"{concept_iri}/owner/{sanitized_email}"
+        
+        # Check if already exists
+        for owner in existing.get("owners", []):
+            if owner.get("user_uri", "").endswith(user_email):
+                raise ValueError(f"User already has ownership: {user_email}")
+        
+        now = datetime.utcnow().isoformat() + "Z"
+        user_uri = f"urn:user:{user_email}"
+        
+        triples = [
+            (ownership_iri, str(RDF.type), str(ONTOS.Ownership), True),
+            (ownership_iri, str(ONTOS.ownershipUser), user_uri, True),
+            (ownership_iri, str(ONTOS.ownershipRole), role, False),
+            (ownership_iri, str(ONTOS.ownershipAssignedAt), now, False),
+            (concept_iri, str(ONTOS.hasOwner), ownership_iri, True),
+        ]
+        
+        if assigned_by:
+            assigner_uri = f"urn:user:{assigned_by}" if not assigned_by.startswith("urn:") else assigned_by
+            triples.append((ownership_iri, str(ONTOS.ownershipAssignedBy), assigner_uri, True))
+        
+        # Add to database
+        for subj, pred, obj, is_uri in triples:
+            rdf_triples_repo.add_triple(
+                self._db,
+                subject_uri=subj,
+                predicate_uri=pred,
+                object_value=obj,
+                object_is_uri=is_uri,
+                context_name=collection_iri,
+                source_type="ownership",
+                source_identifier=concept_iri,
+                created_by=assigned_by,
+            )
+        
+        # Add to in-memory graph
+        coll_context = self._graph.get_context(URIRef(collection_iri))
+        ownership_uri = URIRef(ownership_iri)
+        concept_uri = URIRef(concept_iri)
+        
+        coll_context.add((ownership_uri, RDF.type, ONTOS.Ownership))
+        coll_context.add((ownership_uri, ONTOS.ownershipUser, URIRef(user_uri)))
+        coll_context.add((ownership_uri, ONTOS.ownershipRole, Literal(role)))
+        coll_context.add((ownership_uri, ONTOS.ownershipAssignedAt, Literal(now, datatype=XSD.dateTime)))
+        coll_context.add((concept_uri, ONTOS.hasOwner, ownership_uri))
+        if assigned_by:
+            assigner_uri = f"urn:user:{assigned_by}" if not assigned_by.startswith("urn:") else assigned_by
+            coll_context.add((ownership_uri, ONTOS.ownershipAssignedBy, URIRef(assigner_uri)))
+        
+        self._db.commit()
+        self._invalidate_cache()
+        
+        return self.get_concept(concept_iri)
+
+    def remove_concept_owner(
+        self,
+        concept_iri: str,
+        user_email: str,
+        removed_by: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Remove an owner from a concept."""
+        existing = self.get_concept(concept_iri)
+        if not existing:
+            return None
+        
+        collection_iri = existing.get("source_context")
+        if not collection_iri:
+            raise ValueError("Cannot determine collection for concept")
+        
+        # Find the ownership IRI
+        sanitized_email = _sanitize_context_name(user_email.replace("@", "_at_"))
+        ownership_iri = f"{concept_iri}/owner/{sanitized_email}"
+        
+        # Remove from database
+        rdf_triples_repo.remove_by_subject(self._db, ownership_iri, collection_iri)
+        # Remove the specific hasOwner triple linking concept to this ownership
+        rdf_triples_repo.remove_triple(
+            self._db, concept_iri, str(ONTOS.hasOwner), ownership_iri, collection_iri
+        )
+        
+        # Remove from in-memory graph
+        coll_context = self._graph.get_context(URIRef(collection_iri))
+        ownership_uri = URIRef(ownership_iri)
+        concept_uri = URIRef(concept_iri)
+        
+        for triple in list(coll_context.triples((ownership_uri, None, None))):
+            coll_context.remove(triple)
+        coll_context.remove((concept_uri, ONTOS.hasOwner, ownership_uri))
+        
+        self._db.commit()
+        self._invalidate_cache()
+        
+        return self.get_concept(concept_iri)
+
+    # ========================================================================
+    # LIFECYCLE STATUS TRANSITIONS
+    # ========================================================================
+
+    def update_concept_status(
+        self,
+        concept_iri: str,
+        new_status: str,
+        updated_by: Optional[str] = None,
+        review_request_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Update the status of a concept with validation.
+        
+        Valid transitions:
+        - draft -> under_review (requires reviewers)
+        - under_review -> approved | draft (reviewer action)
+        - approved -> published (admin action)
+        - published -> certified | deprecated
+        - certified -> deprecated | archived
+        - deprecated -> archived
+        """
+        from datetime import datetime
+        
+        VALID_TRANSITIONS = {
+            "draft": ["under_review"],
+            "under_review": ["approved", "draft"],  # draft = changes requested
+            "approved": ["published"],
+            "published": ["certified", "deprecated"],
+            "certified": ["deprecated", "archived"],
+            "deprecated": ["archived"],
+            "archived": [],
+        }
+        
+        existing = self.get_concept(concept_iri)
+        if not existing:
+            return None
+        
+        collection_iri = existing.get("source_context")
+        current_status = existing.get("status") or "draft"
+        
+        # Validate transition
+        allowed = VALID_TRANSITIONS.get(current_status, [])
+        if new_status not in allowed:
+            raise ValueError(f"Invalid status transition: {current_status} -> {new_status}. Allowed: {allowed}")
+        
+        concept_uri = URIRef(concept_iri)
+        coll_context = self._graph.get_context(URIRef(collection_iri))
+        now = datetime.utcnow().isoformat() + "Z"
+        
+        # Update status
+        rdf_triples_repo.remove_by_subject_predicate(self._db, concept_iri, str(ONTOS.status), collection_iri)
+        rdf_triples_repo.add_triple(
+            self._db, concept_iri, str(ONTOS.status), new_status,
+            False, None, None, collection_iri, "concept", concept_iri, updated_by
+        )
+        coll_context.remove((concept_uri, ONTOS.status, None))
+        coll_context.add((concept_uri, ONTOS.status, Literal(new_status)))
+        
+        # Update timestamp
+        rdf_triples_repo.remove_by_subject_predicate(self._db, concept_iri, str(ONTOS.updatedAt), collection_iri)
+        rdf_triples_repo.add_triple(
+            self._db, concept_iri, str(ONTOS.updatedAt), now,
+            False, None, None, collection_iri, "concept", concept_iri, updated_by
+        )
+        coll_context.remove((concept_uri, ONTOS.updatedAt, None))
+        coll_context.add((concept_uri, ONTOS.updatedAt, Literal(now, datatype=XSD.dateTime)))
+        
+        # Handle status-specific fields
+        if new_status == "under_review" and review_request_id:
+            rdf_triples_repo.remove_by_subject_predicate(self._db, concept_iri, str(ONTOS.reviewRequestId), collection_iri)
+            rdf_triples_repo.add_triple(
+                self._db, concept_iri, str(ONTOS.reviewRequestId), review_request_id,
+                False, None, None, collection_iri, "concept", concept_iri, updated_by
+            )
+            coll_context.remove((concept_uri, ONTOS.reviewRequestId, None))
+            coll_context.add((concept_uri, ONTOS.reviewRequestId, Literal(review_request_id)))
+        
+        if new_status == "published" and updated_by:
+            user_uri = f"urn:user:{updated_by}" if not updated_by.startswith("urn:") else updated_by
+            rdf_triples_repo.remove_by_subject_predicate(self._db, concept_iri, str(ONTOS.publishedAt), collection_iri)
+            rdf_triples_repo.remove_by_subject_predicate(self._db, concept_iri, str(ONTOS.publishedBy), collection_iri)
+            rdf_triples_repo.add_triple(
+                self._db, concept_iri, str(ONTOS.publishedAt), now,
+                False, None, None, collection_iri, "concept", concept_iri, updated_by
+            )
+            rdf_triples_repo.add_triple(
+                self._db, concept_iri, str(ONTOS.publishedBy), user_uri,
+                True, None, None, collection_iri, "concept", concept_iri, updated_by
+            )
+            coll_context.remove((concept_uri, ONTOS.publishedAt, None))
+            coll_context.remove((concept_uri, ONTOS.publishedBy, None))
+            coll_context.add((concept_uri, ONTOS.publishedAt, Literal(now, datatype=XSD.dateTime)))
+            coll_context.add((concept_uri, ONTOS.publishedBy, URIRef(user_uri)))
+        
+        if new_status == "certified" and updated_by:
+            from datetime import timedelta
+            user_uri = f"urn:user:{updated_by}" if not updated_by.startswith("urn:") else updated_by
+            expires = (datetime.utcnow() + timedelta(days=365)).isoformat() + "Z"
+            
+            rdf_triples_repo.remove_by_subject_predicate(self._db, concept_iri, str(ONTOS.certifiedAt), collection_iri)
+            rdf_triples_repo.remove_by_subject_predicate(self._db, concept_iri, str(ONTOS.certifiedBy), collection_iri)
+            rdf_triples_repo.remove_by_subject_predicate(self._db, concept_iri, str(ONTOS.certificationExpiresAt), collection_iri)
+            rdf_triples_repo.add_triple(
+                self._db, concept_iri, str(ONTOS.certifiedAt), now,
+                False, None, None, collection_iri, "concept", concept_iri, updated_by
+            )
+            rdf_triples_repo.add_triple(
+                self._db, concept_iri, str(ONTOS.certifiedBy), user_uri,
+                True, None, None, collection_iri, "concept", concept_iri, updated_by
+            )
+            rdf_triples_repo.add_triple(
+                self._db, concept_iri, str(ONTOS.certificationExpiresAt), expires,
+                False, None, None, collection_iri, "concept", concept_iri, updated_by
+            )
+            coll_context.remove((concept_uri, ONTOS.certifiedAt, None))
+            coll_context.remove((concept_uri, ONTOS.certifiedBy, None))
+            coll_context.remove((concept_uri, ONTOS.certificationExpiresAt, None))
+            coll_context.add((concept_uri, ONTOS.certifiedAt, Literal(now, datatype=XSD.dateTime)))
+            coll_context.add((concept_uri, ONTOS.certifiedBy, URIRef(user_uri)))
+            coll_context.add((concept_uri, ONTOS.certificationExpiresAt, Literal(expires, datatype=XSD.dateTime)))
+        
+        self._db.commit()
+        self._invalidate_cache()
+        
+        return self.get_concept(concept_iri)
+
+    def submit_concept_for_review(
+        self,
+        concept_iri: str,
+        reviewer_email: str,
+        submitted_by: str,
+        notes: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Submit a concept for review via the DataAssetReviewManager.
+        
+        Creates a review request and updates concept status to 'under_review'.
+        Returns the updated concept with review_request_id set.
+        """
+        from src.models.data_asset_reviews import (
+            DataAssetReviewRequestCreate,
+            AssetType,
+        )
+        
+        existing = self.get_concept(concept_iri)
+        if not existing:
+            raise ValueError(f"Concept not found: {concept_iri}")
+        
+        status = existing.get("status") or "draft"
+        if status != "draft":
+            raise ValueError(f"Can only submit draft concepts for review. Current status: {status}")
+        
+        # Create the review request
+        # Note: This requires the DataAssetReviewManager to be available
+        # The actual integration happens in the route layer
+        review_request_data = {
+            "concept_iri": concept_iri,
+            "concept_label": existing.get("label"),
+            "reviewer_email": reviewer_email,
+            "requester_email": submitted_by,
+            "notes": notes,
+            "asset_type": "knowledge_concept",
+        }
+        
+        # Return the data needed for review request creation
+        # The route layer will create the actual review request
+        return review_request_data
+
+    # ========================================================================
+    # COLLECTION EXPORT
+    # ========================================================================
+
+    def export_collection_as_turtle(self, collection_iri: str) -> str:
+        """Export a collection's concepts as Turtle format.
+        
+        Returns the serialized RDF graph for the collection.
+        """
+        collection = self.get_collection(collection_iri)
+        if not collection:
+            raise ValueError(f"Collection not found: {collection_iri}")
+        
+        # Get the context for this collection
+        try:
+            coll_context = self._graph.get_context(URIRef(collection_iri))
+            return coll_context.serialize(format='turtle')
+        except Exception as e:
+            logger.error(f"Failed to export collection: {e}")
+            raise ValueError(f"Failed to export collection: {e}")
+
+    def export_collection_as_rdfxml(self, collection_iri: str) -> str:
+        """Export a collection's concepts as RDF/XML format.
+        
+        Returns the serialized RDF graph for the collection.
+        """
+        collection = self.get_collection(collection_iri)
+        if not collection:
+            raise ValueError(f"Collection not found: {collection_iri}")
+        
+        try:
+            coll_context = self._graph.get_context(URIRef(collection_iri))
+            return coll_context.serialize(format='xml')
+        except Exception as e:
+            logger.error(f"Failed to export collection: {e}")
+            raise ValueError(f"Failed to export collection: {e}")
+
+    def import_rdf_to_collection(
+        self,
+        collection_iri: str,
+        content: str,
+        format: str = "turtle",
+        imported_by: Optional[str] = None,
+    ) -> int:
+        """Import RDF content into an existing collection.
+        
+        Parses the RDF and adds triples to the collection's context.
+        Returns the number of triples imported.
+        """
+        collection = self.get_collection(collection_iri)
+        if not collection:
+            raise ValueError(f"Collection not found: {collection_iri}")
+        if not collection.get("is_editable"):
+            raise ValueError(f"Collection is not editable: {collection_iri}")
+        
+        # Parse the content
+        temp_graph = Graph()
+        rdf_format = "turtle" if format.lower() in ("ttl", "turtle") else "xml"
+        temp_graph.parse(data=content, format=rdf_format)
+        
+        # Import to database
+        count = self._import_graph_to_db(
+            graph=temp_graph,
+            context_name=collection_iri,
+            source_type="import",
+            source_identifier=collection_iri,
+            created_by=imported_by,
+        )
+        
+        # Also add to in-memory graph
+        coll_context = self._graph.get_context(URIRef(collection_iri))
+        for triple in temp_graph:
+            coll_context.add(triple)
+        
+        self._invalidate_cache()
+        
+        return count
+
+    # ========================================================================
+    # COLLECTION HIERARCHY
+    # ========================================================================
+
+    def get_collections_with_hierarchy(self) -> List[Dict[str, Any]]:
+        """Get collections organized as a hierarchy tree.
+        
+        Returns root collections with nested child_collections arrays.
+        """
+        all_collections = self.get_collections()
+        
+        # Build lookup map
+        by_iri = {c["iri"]: c for c in all_collections}
+        
+        # Add child_collections to each
+        for coll in all_collections:
+            coll["child_collections"] = []
+        
+        # Build hierarchy
+        roots = []
+        for coll in all_collections:
+            parent_iri = coll.get("parent_collection_iri")
+            if parent_iri and parent_iri in by_iri:
+                by_iri[parent_iri]["child_collections"].append(coll)
+            else:
+                roots.append(coll)
+        
+        # Sort children
+        def sort_children(coll):
+            scope_order = {"enterprise": 0, "domain": 1, "department": 2, "team": 3, "project": 4, "external": 5}
+            coll["child_collections"].sort(key=lambda c: (scope_order.get(c.get("scope_level", ""), 99), c.get("label", "")))
+            for child in coll["child_collections"]:
+                sort_children(child)
+        
+        for root in roots:
+            sort_children(root)
+        
+        return roots
+
+    def get_collection_ancestors(self, collection_iri: str) -> List[Dict[str, Any]]:
+        """Get all ancestor collections for a given collection."""
+        all_collections = self.get_collections()
+        by_iri = {c["iri"]: c for c in all_collections}
+        
+        ancestors = []
+        current = by_iri.get(collection_iri)
+        
+        while current:
+            parent_iri = current.get("parent_collection_iri")
+            if parent_iri and parent_iri in by_iri:
+                parent = by_iri[parent_iri]
+                ancestors.append(parent)
+                current = parent
+            else:
+                break
+        
+        ancestors.reverse()  # Root first
+        return ancestors
+
+    def get_collection_descendants(self, collection_iri: str) -> List[Dict[str, Any]]:
+        """Get all descendant collections for a given collection."""
+        all_collections = self.get_collections()
+        
+        descendants = []
+        stack = [collection_iri]
+        
+        while stack:
+            current_iri = stack.pop()
+            for coll in all_collections:
+                if coll.get("parent_collection_iri") == current_iri:
+                    descendants.append(coll)
+                    stack.append(coll["iri"])
+        
+        return descendants
+
+    # ========================================================================
+    # PROMOTION AND MIGRATION
+    # ========================================================================
+
+    def promote_concept(
+        self,
+        concept_iri: str,
+        target_collection_iri: str,
+        deprecate_source: bool = True,
+        promoted_by: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Promote a concept to a higher-scope collection.
+        
+        Creates a copy in the target collection with provenance tracking.
+        Optionally deprecates the original.
+        """
+        from datetime import datetime
+        
+        existing = self.get_concept(concept_iri)
+        if not existing:
+            raise ValueError(f"Concept not found: {concept_iri}")
+        
+        source_collection_iri = existing.get("source_context")
+        target_collection = self.get_collection(target_collection_iri)
+        
+        if not target_collection:
+            raise ValueError(f"Target collection not found: {target_collection_iri}")
+        if not target_collection.get("is_editable"):
+            raise ValueError(f"Target collection is not editable: {target_collection_iri}")
+        
+        # Generate new IRI in target collection
+        label = existing.get("label") or concept_iri.split("/")[-1]
+        sanitized = _sanitize_context_name(label.lower().replace(" ", "-"))
+        new_iri = f"{target_collection_iri}/{sanitized}"
+        
+        # Check if already exists
+        if self.get_concept(new_iri):
+            raise ValueError(f"Concept already exists in target: {new_iri}")
+        
+        # Create new concept with provenance
+        new_concept = self.create_concept(
+            collection_iri=target_collection_iri,
+            label=label,
+            definition=existing.get("comment"),
+            concept_type=existing.get("concept_type", "concept"),
+            synonyms=existing.get("synonyms", []),
+            examples=existing.get("examples", []),
+            broader_iris=existing.get("parent_concepts", []),
+            narrower_iris=existing.get("child_concepts", []),
+            related_iris=existing.get("related_concepts", []),
+            created_by=promoted_by,
+        )
+        
+        # Add provenance triples
+        now = datetime.utcnow().isoformat() + "Z"
+        provenance_triples = [
+            (new_iri, str(ONTOS.sourceConceptIri), concept_iri, True),
+            (new_iri, str(ONTOS.sourceCollectionIri), source_collection_iri, True),
+            (new_iri, str(ONTOS.promotionType), "promoted", False),
+            (new_iri, str(ONTOS.promotedAt), now, False),
+        ]
+        if promoted_by:
+            user_uri = f"urn:user:{promoted_by}" if not promoted_by.startswith("urn:") else promoted_by
+            provenance_triples.append((new_iri, str(ONTOS.promotedBy), user_uri, True))
+        
+        for subj, pred, obj, is_uri in provenance_triples:
+            rdf_triples_repo.add_triple(
+                self._db, subj, pred, obj, is_uri,
+                None, None, target_collection_iri, "concept", new_iri, promoted_by
+            )
+        
+        # Update in-memory graph
+        target_context = self._graph.get_context(URIRef(target_collection_iri))
+        new_uri = URIRef(new_iri)
+        target_context.add((new_uri, ONTOS.sourceConceptIri, URIRef(concept_iri)))
+        target_context.add((new_uri, ONTOS.sourceCollectionIri, URIRef(source_collection_iri)))
+        target_context.add((new_uri, ONTOS.promotionType, Literal("promoted")))
+        target_context.add((new_uri, ONTOS.promotedAt, Literal(now, datatype=XSD.dateTime)))
+        if promoted_by:
+            user_uri = f"urn:user:{promoted_by}" if not promoted_by.startswith("urn:") else promoted_by
+            target_context.add((new_uri, ONTOS.promotedBy, URIRef(user_uri)))
+        
+        # Deprecate original if requested
+        if deprecate_source:
+            self.update_concept_status(concept_iri, "deprecated", promoted_by)
+            # Add seeAlso to point to promoted version
+            rdf_triples_repo.add_triple(
+                self._db, concept_iri, str(RDFS.seeAlso), new_iri,
+                True, None, None, source_collection_iri, "concept", concept_iri, promoted_by
+            )
+            source_context = self._graph.get_context(URIRef(source_collection_iri))
+            source_context.add((URIRef(concept_iri), RDFS.seeAlso, URIRef(new_iri)))
+        
+        self._db.commit()
+        self._invalidate_cache()
+        
+        return self.get_concept(new_iri)
+
+    def migrate_concept(
+        self,
+        concept_iri: str,
+        target_collection_iri: str,
+        delete_source: bool = False,
+        migrated_by: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Migrate a concept to a different collection (not necessarily in hierarchy).
+        
+        Similar to promote but uses 'migrated' provenance type.
+        Can optionally delete the source concept (only if draft).
+        """
+        from datetime import datetime
+        
+        existing = self.get_concept(concept_iri)
+        if not existing:
+            raise ValueError(f"Concept not found: {concept_iri}")
+        
+        source_collection_iri = existing.get("source_context")
+        target_collection = self.get_collection(target_collection_iri)
+        
+        if not target_collection:
+            raise ValueError(f"Target collection not found: {target_collection_iri}")
+        if not target_collection.get("is_editable"):
+            raise ValueError(f"Target collection is not editable: {target_collection_iri}")
+        
+        # Generate new IRI in target collection
+        label = existing.get("label") or concept_iri.split("/")[-1]
+        sanitized = _sanitize_context_name(label.lower().replace(" ", "-"))
+        new_iri = f"{target_collection_iri}/{sanitized}"
+        
+        # Check if already exists
+        if self.get_concept(new_iri):
+            raise ValueError(f"Concept already exists in target: {new_iri}")
+        
+        # Create new concept with provenance
+        new_concept = self.create_concept(
+            collection_iri=target_collection_iri,
+            label=label,
+            definition=existing.get("comment"),
+            concept_type=existing.get("concept_type", "concept"),
+            synonyms=existing.get("synonyms", []),
+            examples=existing.get("examples", []),
+            broader_iris=existing.get("parent_concepts", []),
+            narrower_iris=existing.get("child_concepts", []),
+            related_iris=existing.get("related_concepts", []),
+            created_by=migrated_by,
+        )
+        
+        # Add provenance triples
+        now = datetime.utcnow().isoformat() + "Z"
+        provenance_triples = [
+            (new_iri, str(ONTOS.sourceConceptIri), concept_iri, True),
+            (new_iri, str(ONTOS.sourceCollectionIri), source_collection_iri, True),
+            (new_iri, str(ONTOS.promotionType), "migrated", False),
+            (new_iri, str(ONTOS.promotedAt), now, False),
+        ]
+        if migrated_by:
+            user_uri = f"urn:user:{migrated_by}" if not migrated_by.startswith("urn:") else migrated_by
+            provenance_triples.append((new_iri, str(ONTOS.promotedBy), user_uri, True))
+        
+        for subj, pred, obj, is_uri in provenance_triples:
+            rdf_triples_repo.add_triple(
+                self._db, subj, pred, obj, is_uri,
+                None, None, target_collection_iri, "concept", new_iri, migrated_by
+            )
+        
+        # Update in-memory graph
+        target_context = self._graph.get_context(URIRef(target_collection_iri))
+        new_uri = URIRef(new_iri)
+        target_context.add((new_uri, ONTOS.sourceConceptIri, URIRef(concept_iri)))
+        target_context.add((new_uri, ONTOS.sourceCollectionIri, URIRef(source_collection_iri)))
+        target_context.add((new_uri, ONTOS.promotionType, Literal("migrated")))
+        target_context.add((new_uri, ONTOS.promotedAt, Literal(now, datatype=XSD.dateTime)))
+        
+        # Delete or deprecate original
+        if delete_source:
+            status = existing.get("status")
+            if status and status != "draft":
+                raise ValueError("Cannot delete non-draft concept. Will deprecate instead.")
+            self.delete_concept(concept_iri, migrated_by)
+        else:
+            self.update_concept_status(concept_iri, "deprecated", migrated_by)
+        
+        self._db.commit()
+        self._invalidate_cache()
+        
+        return self.get_concept(new_iri)
+
+    # ========================================================================
+    # HELPER METHODS
+    # ========================================================================
+
+    def _get_literal(self, context, subject: URIRef, predicate) -> Optional[str]:
+        """Get a literal value from a triple."""
+        for obj in context.objects(subject, predicate):
+            if isinstance(obj, Literal):
+                return str(obj)
+            elif isinstance(obj, str):
+                return obj
+        return None
+
+    def _get_uri(self, context, subject: URIRef, predicate) -> Optional[str]:
+        """Get a URI value from a triple."""
+        for obj in context.objects(subject, predicate):
+            if isinstance(obj, URIRef):
+                return str(obj)
+            elif isinstance(obj, str) and (obj.startswith("urn:") or obj.startswith("http")):
+                return obj
+        return None
+
+    def _invalidate_cache(self):
+        """Invalidate all cached results."""
+        self._cache.clear()
 

@@ -54,6 +54,10 @@ class AssetType(str, Enum):
     # MDM assets
     MDM_MATCH = "mdm_match"
     
+    # Knowledge system assets
+    KNOWLEDGE_CONCEPT = "knowledge_concept"
+    KNOWLEDGE_COLLECTION = "knowledge_collection"
+    
     # Generic/external
     EXTERNAL = "external"
     OTHER = "other"

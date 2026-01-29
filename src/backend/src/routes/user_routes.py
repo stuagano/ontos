@@ -232,8 +232,8 @@ async def request_role_access(
     role_id: str,
     request_body: RoleAccessRequest,
     request: Request,
-    db: Session = Depends(get_db), # Inject DB session
-    audit_manager: AuditManagerDep = Depends(),
+    db: DBSessionDep,
+    audit_manager: AuditManagerDep,
     user_details: UserInfo = Depends(get_user_details_from_sdk),
     settings_manager: SettingsManager = Depends(get_settings_manager),
     notifications_manager: NotificationsManager = Depends(get_notifications_manager)
