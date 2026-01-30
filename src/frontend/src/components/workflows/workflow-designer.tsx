@@ -32,6 +32,16 @@ import { Switch } from '@/components/ui/switch';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { 
   Save, 
   ArrowLeft, 
@@ -49,6 +59,7 @@ import {
   Play,
   ClipboardCheck,
   FileSearch,
+  Globe,
 } from 'lucide-react';
 
 import {
@@ -62,6 +73,7 @@ import {
   EndNode,
   PolicyCheckNode,
   CreateAssetReviewNode,
+  WebhookNode,
 } from './workflow-nodes';
 
 import type {
@@ -75,6 +87,7 @@ import type {
   EntityType,
   StepTypeSchema,
   CompliancePolicyRef,
+  HttpConnectionRef,
 } from '@/types/process-workflow';
 import { 
   getTriggerTypeLabel, 
@@ -96,6 +109,7 @@ const nodeTypes = {
   fail: EndNode,
   policy_check: PolicyCheckNode,
   create_asset_review: CreateAssetReviewNode,
+  webhook: WebhookNode,
 };
 
 // Layout helper
@@ -224,6 +238,8 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
   const [stepTypes, setStepTypes] = useState<StepTypeSchema[]>([]);
   const [compliancePolicies, setCompliancePolicies] = useState<CompliancePolicyRef[]>([]);
   const [availableRoles, setAvailableRoles] = useState<{ id: string; name: string; has_groups: boolean }[]>([]);
+  const [httpConnections, setHttpConnections] = useState<HttpConnectionRef[]>([]);
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   
   // Form state
   const [name, setName] = useState('');
@@ -232,10 +248,44 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
   const [entityTypes, setEntityTypes] = useState<EntityType[]>(['table']);
   const [isActive, setIsActive] = useState(true);
   const [steps, setSteps] = useState<WorkflowStepCreate[]>([]);
+  
+  // Track initial state for dirty checking
+  interface OriginalState {
+    name: string;
+    description: string;
+    triggerType: TriggerType;
+    entityTypes: EntityType[];
+    isActive: boolean;
+    steps: WorkflowStepCreate[];
+  }
+  const [originalState, setOriginalState] = useState<OriginalState | null>(null);
 
   // React Flow state
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  
+  // Compute dirty state - compare current values to original
+  const isDirty = useMemo(() => {
+    if (!originalState) {
+      // For new workflows, dirty if any content exists
+      return isNew && (name.trim() !== '' || description.trim() !== '' || steps.length > 0);
+    }
+    
+    // Compare each field
+    if (name !== originalState.name) return true;
+    if (description !== originalState.description) return true;
+    if (triggerType !== originalState.triggerType) return true;
+    if (isActive !== originalState.isActive) return true;
+    
+    // Compare entity types
+    if (entityTypes.length !== originalState.entityTypes.length) return true;
+    if (!entityTypes.every(et => originalState.entityTypes.includes(et))) return true;
+    
+    // Compare steps (deep comparison via JSON)
+    if (JSON.stringify(steps) !== JSON.stringify(originalState.steps)) return true;
+    
+    return false;
+  }, [originalState, name, description, triggerType, entityTypes, isActive, steps, isNew]);
 
   // Set up breadcrumbs
   useEffect(() => {
@@ -256,6 +306,20 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
       setDynamicTitle(name);
     }
   }, [name, setDynamicTitle]);
+
+  // Warn user when navigating away with unsaved changes (browser-level)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '';  // Required for Chrome
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
 
   // Load workflow
   useEffect(() => {
@@ -295,6 +359,19 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
         console.error('Failed to load roles:', error);
         setAvailableRoles([]);
       }
+      
+      // Load HTTP connections for webhook step selector
+      try {
+        const connectionsResponse = await get<HttpConnectionRef[]>('/api/workflows/http-connections');
+        if (connectionsResponse.data && Array.isArray(connectionsResponse.data)) {
+          setHttpConnections(connectionsResponse.data);
+        } else {
+          setHttpConnections([]);
+        }
+      } catch (error) {
+        console.error('Failed to load HTTP connections:', error);
+        setHttpConnections([]);
+      }
 
       // Load workflow if editing
       if (!isNew) {
@@ -309,7 +386,7 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
             setTriggerType(response.data.trigger.type);
             setEntityTypes(response.data.trigger.entity_types);
             setIsActive(response.data.is_active);
-            setSteps(response.data.steps.map(s => ({
+            const loadedSteps = response.data.steps.map(s => ({
               step_id: s.step_id,
               name: s.name,
               step_type: s.step_type,
@@ -318,7 +395,18 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
               on_fail: s.on_fail,
               order: s.order,
               position: s.position,
-            })));
+            }));
+            setSteps(loadedSteps);
+            
+            // Store original state for dirty tracking
+            setOriginalState({
+              name: response.data.name,
+              description: response.data.description || '',
+              triggerType: response.data.trigger.type,
+              entityTypes: [...response.data.trigger.entity_types],
+              isActive: response.data.is_active,
+              steps: loadedSteps.map(s => ({ ...s })),
+            });
             
             // Convert to flow elements - rolesMap will be empty initially, but nodes will be updated
             // when availableRoles loads (via updateNodesWithRoles effect)
@@ -343,6 +431,16 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
           data: { trigger: { type: 'on_create', entity_types: ['table'] } },
           position: { x: 100, y: 50 },
         }]);
+        
+        // Set original state for new workflow dirty tracking
+        setOriginalState({
+          name: '',
+          description: '',
+          triggerType: 'on_create',
+          entityTypes: ['table'],
+          isActive: true,
+          steps: [],
+        });
       }
     };
 
@@ -482,6 +580,16 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
       }
 
       if (response.data && response.data.id) {
+        // Update original state to match current (clears dirty flag)
+        setOriginalState({
+          name,
+          description,
+          triggerType,
+          entityTypes: [...entityTypes],
+          isActive,
+          steps: steps.map(s => ({ ...s })),
+        });
+        
         toast({
           title: 'Success',
           description: `Workflow ${isNew ? 'created' : 'updated'} successfully`,
@@ -518,7 +626,17 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => navigate('/workflows')}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              if (isDirty) {
+                setShowDiscardDialog(true);
+              } else {
+                navigate('/workflows');
+              }
+            }}
+          >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
@@ -532,15 +650,20 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
             className="text-lg font-semibold border-none shadow-none px-2 h-8 min-w-[200px]"
             style={{ width: `${Math.max(200, name.length * 12 + 20)}px` }}
           />
+          {isDirty && (
+            <Badge variant="outline" className="text-amber-600 border-amber-500 dark:text-amber-400 dark:border-amber-400/50">
+              Unsaved changes
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 mr-2">
             <Switch checked={isActive} onCheckedChange={setIsActive} />
             <span className="text-sm">{isActive ? 'Active' : 'Inactive'}</span>
           </div>
-          <Button onClick={handleSave} disabled={isSaving} size="sm">
+          <Button onClick={handleSave} disabled={isSaving} size="sm" className={isDirty ? 'ring-2 ring-amber-500/50' : ''}>
             {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            Save
+            Save{isDirty ? ' *' : ''}
           </Button>
         </div>
       </div>
@@ -595,6 +718,9 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
                 <Button variant="ghost" size="sm" className="justify-start" onClick={() => addStep('create_asset_review')}>
                   <FileSearch className="h-4 w-4 mr-2" /> Asset Review
                 </Button>
+                <Button variant="ghost" size="sm" className="justify-start" onClick={() => addStep('webhook')}>
+                  <Globe className="h-4 w-4 mr-2 text-orange-500" /> Webhook
+                </Button>
                 <Separator className="my-1" />
                 <Button variant="ghost" size="sm" className="justify-start" onClick={() => addStep('pass')}>
                   <CheckCircle className="h-4 w-4 mr-2 text-green-500" /> Pass
@@ -606,6 +732,27 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
             </Panel>
           </ReactFlow>
         </div>
+
+        {/* Discard changes confirmation dialog */}
+        <AlertDialog open={showDiscardDialog} onOpenChange={setShowDiscardDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You have unsaved changes to this workflow. If you leave now, your changes will be lost.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Stay</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => navigate('/workflows')}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Discard Changes
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Properties panel */}
         <Sheet open={!!selectedNodeId} onOpenChange={() => setSelectedNodeId(null)}>
@@ -943,6 +1090,171 @@ export default function WorkflowDesigner({ workflowId }: WorkflowDesignerProps) 
                           placeholder="Additional notes for the reviewer..."
                           rows={2}
                         />
+                      </div>
+                    </>
+                  )}
+
+                  {selectedStep.step_type === 'webhook' && (
+                    <>
+                      <div>
+                        <Label>Mode</Label>
+                        <Select 
+                          value={(selectedStep.config as { connection_name?: string })?.connection_name ? 'connection' : 'inline'}
+                          onValueChange={(v) => {
+                            if (v === 'connection') {
+                              updateStep(selectedStep.step_id, { 
+                                config: { 
+                                  ...selectedStep.config, 
+                                  url: undefined,
+                                  connection_name: '' 
+                                }
+                              });
+                            } else {
+                              updateStep(selectedStep.step_id, { 
+                                config: { 
+                                  ...selectedStep.config, 
+                                  connection_name: undefined,
+                                  url: '' 
+                                }
+                              });
+                            }
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select mode" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="connection">UC Connection (Recommended)</SelectItem>
+                            <SelectItem value="inline">Inline URL</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          UC Connections store credentials securely in Unity Catalog.
+                        </p>
+                      </div>
+                      
+                      {(selectedStep.config as { connection_name?: string })?.connection_name !== undefined && (
+                        <>
+                          <div>
+                            <Label>HTTP Connection</Label>
+                            <Select 
+                              value={(selectedStep.config as { connection_name?: string })?.connection_name || ''}
+                              onValueChange={(v) => updateStep(selectedStep.step_id, { 
+                                config: { ...selectedStep.config, connection_name: v }
+                              })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a UC HTTP Connection" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {httpConnections.length === 0 ? (
+                                  <div className="px-2 py-3 text-sm text-muted-foreground">
+                                    No HTTP connections found
+                                  </div>
+                                ) : (
+                                  httpConnections.map((conn) => (
+                                    <SelectItem key={conn.name} value={conn.name}>
+                                      {conn.name}
+                                    </SelectItem>
+                                  ))
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label>Path</Label>
+                            <Input
+                              value={(selectedStep.config as { path?: string })?.path || ''}
+                              onChange={(e) => updateStep(selectedStep.step_id, { 
+                                config: { ...selectedStep.config, path: e.target.value }
+                              })}
+                              placeholder="/api/now/table/incident"
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Path appended to the connection's base URL.
+                            </p>
+                          </div>
+                        </>
+                      )}
+                      
+                      {(selectedStep.config as { url?: string })?.url !== undefined && (
+                        <div>
+                          <Label>URL</Label>
+                          <Input
+                            value={(selectedStep.config as { url?: string })?.url || ''}
+                            onChange={(e) => updateStep(selectedStep.step_id, { 
+                              config: { ...selectedStep.config, url: e.target.value }
+                            })}
+                            placeholder="https://api.example.com/webhook"
+                          />
+                          <p className="text-xs text-amber-600 mt-1">
+                            Warning: Inline credentials are stored in workflow config.
+                          </p>
+                        </div>
+                      )}
+                      
+                      <div>
+                        <Label>HTTP Method</Label>
+                        <Select 
+                          value={(selectedStep.config as { method?: string })?.method || 'POST'}
+                          onValueChange={(v) => updateStep(selectedStep.step_id, { 
+                            config: { ...selectedStep.config, method: v }
+                          })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select method" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="GET">GET</SelectItem>
+                            <SelectItem value="POST">POST</SelectItem>
+                            <SelectItem value="PUT">PUT</SelectItem>
+                            <SelectItem value="PATCH">PATCH</SelectItem>
+                            <SelectItem value="DELETE">DELETE</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div>
+                        <Label>Body Template</Label>
+                        <Textarea
+                          value={(selectedStep.config as { body_template?: string })?.body_template || ''}
+                          onChange={(e) => updateStep(selectedStep.step_id, { 
+                            config: { ...selectedStep.config, body_template: e.target.value }
+                          })}
+                          placeholder={'{\n  "description": "Alert for ${entity_name}",\n  "entity_type": "${entity_type}"\n}'}
+                          rows={5}
+                          className="font-mono text-sm"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Use {'${variable}'} for substitution: entity_type, entity_id, entity_name, user_email, workflow_name
+                        </p>
+                      </div>
+                      
+                      <div>
+                        <Label>Timeout (seconds)</Label>
+                        <Input
+                          type="number"
+                          value={(selectedStep.config as { timeout_seconds?: number })?.timeout_seconds || 30}
+                          onChange={(e) => updateStep(selectedStep.step_id, { 
+                            config: { ...selectedStep.config, timeout_seconds: parseInt(e.target.value) || 30 }
+                          })}
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label>Retry Count</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={5}
+                          value={(selectedStep.config as { retry_count?: number })?.retry_count || 0}
+                          onChange={(e) => updateStep(selectedStep.step_id, { 
+                            config: { ...selectedStep.config, retry_count: parseInt(e.target.value) || 0 }
+                          })}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Number of retries on failure (0-5).
+                        </p>
                       </div>
                     </>
                   )}
