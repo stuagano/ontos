@@ -1522,12 +1522,15 @@ class SemanticModelsManager:
                                 if hasattr(context, 'identifier')]
 
         for context_name, context in contexts_to_search:
-            # Find all classes and concepts in this context - expanded to catch all defined resources
+            # Find all classes and concepts in this context
+            # NOTE: Removed expensive UNION clauses that scanned all rdf:type triples
+            # which caused server to hang with large triple counts (50k+)
             class_query = """
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
             PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
             PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
             PREFIX owl: <http://www.w3.org/2002/07/owl#>
+            PREFIX dcat: <http://www.w3.org/ns/dcat#>
             SELECT DISTINCT ?concept ?label ?comment WHERE {
                 {
                     ?concept a rdfs:Class .
@@ -1538,18 +1541,16 @@ class SemanticModelsManager:
                 } UNION {
                     ?concept a owl:Class .
                 } UNION {
-                    # Include any resource that is used as a class (has instances or subclasses)
+                    ?concept a owl:ObjectProperty .
+                } UNION {
+                    ?concept a owl:DatatypeProperty .
+                } UNION {
+                    ?concept a rdf:Property .
+                } UNION {
+                    # Include any resource that has subclass relationships
                     ?concept rdfs:subClassOf ?parent .
-                } UNION {
-                    ?instance a ?concept .
-                    FILTER(?concept != rdfs:Class && ?concept != skos:Concept && ?concept != rdf:Property && ?concept != owl:Class)
-                } UNION {
-                    # Include resources with semantic properties that make them conceptual
-                    ?concept rdfs:label ?someLabel .
-                    ?concept rdfs:comment ?someComment .
                 }
                 # Extract labels with priority: skos:prefLabel > rdfs:label
-                # Use STR() to handle language tags properly
                 OPTIONAL { ?concept skos:prefLabel ?skos_pref_label }
                 OPTIONAL { ?concept rdfs:label ?rdfs_label }
                 BIND(COALESCE(STR(?skos_pref_label), STR(?rdfs_label)) AS ?label)
