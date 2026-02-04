@@ -10,7 +10,6 @@ This manager handles the Industry Ontology Library feature, providing:
 
 from pathlib import Path
 from typing import Optional, List, Dict, Any
-from io import StringIO
 import yaml
 
 from rdflib import Graph
@@ -315,9 +314,12 @@ class IndustryOntologyManager:
         
         # Serialize to Turtle format
         try:
-            output = StringIO()
-            combined_graph.serialize(output, format='turtle')
-            turtle_content = output.getvalue()
+            # serialize() returns bytes when no destination is given, decode to string
+            turtle_bytes = combined_graph.serialize(format='turtle')
+            if isinstance(turtle_bytes, bytes):
+                turtle_content = turtle_bytes.decode('utf-8')
+            else:
+                turtle_content = turtle_bytes
             
         except Exception as e:
             logger.error(f"Failed to serialize graph: {e}")
