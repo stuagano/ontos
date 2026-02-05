@@ -384,10 +384,11 @@ export const ConceptsTab: React.FC<ConceptsTabProps> = ({
     );
   };
   
-  // Helper to get concept label by IRI
+  // Helper to get concept label by IRI with language resolution
   const getConceptLabel = (iri: string): string => {
     const concept = filteredConcepts.find(c => c.iri === iri);
-    return concept?.label || iri.split(/[/#]/).pop() || iri;
+    if (concept) return resolveLabel(concept, selectedLanguage);
+    return iri.split(/[/#]/).pop() || iri;
   };
   
   return (
