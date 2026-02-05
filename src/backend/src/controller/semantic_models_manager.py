@@ -2169,21 +2169,54 @@ class SemanticModelsManager:
 
                     prop_uri = URIRef(prop_iri)
 
-                    # Get label
-                    labels = list(context.objects(prop_uri, RDFS.label))
-                    label = str(labels[0]) if labels else None
-                    if not label:
-                        # Extract from IRI
-                        if '#' in prop_iri:
-                            label = prop_iri.split('#')[-1]
-                        elif '/' in prop_iri:
-                            label = prop_iri.split('/')[-1]
-                        else:
-                            label = prop_iri
+                    # Build labels dictionary with all language variants
+                    labels_dict = {}
+                    # Get skos:prefLabel values (preferred)
+                    for label_literal in context.objects(prop_uri, SKOS.prefLabel):
+                        lang = getattr(label_literal, 'language', None) or ""
+                        labels_dict[lang] = str(label_literal)
+                    # Get rdfs:label values (fallback, don't overwrite prefLabel)
+                    for label_literal in context.objects(prop_uri, RDFS.label):
+                        lang = getattr(label_literal, 'language', None) or ""
+                        if lang not in labels_dict:
+                            labels_dict[lang] = str(label_literal)
+                    
+                    # Helper to find label by language with regional variant support
+                    def find_by_lang(d: dict, lang: str) -> str | None:
+                        if lang in d:
+                            return d[lang]
+                        prefix = lang + '-'
+                        for k, v in d.items():
+                            if k.startswith(prefix):
+                                return v
+                        return None
+                    
+                    # Compute primary label with fallback chain: en > "" (no lang) > any > IRI local name
+                    primary_label = (
+                        find_by_lang(labels_dict, 'en') or
+                        labels_dict.get('') or
+                        (next(iter(labels_dict.values()), None) if labels_dict else None) or
+                        prop_iri.split('#')[-1].split('/')[-1]
+                    )
 
-                    # Get comment
-                    comments = list(context.objects(prop_uri, RDFS.comment))
-                    comment = str(comments[0]) if comments else None
+                    # Build comments dictionary with all language variants
+                    comments_dict = {}
+                    # Get skos:definition values (preferred)
+                    for def_literal in context.objects(prop_uri, SKOS.definition):
+                        lang = getattr(def_literal, 'language', None) or ""
+                        comments_dict[lang] = str(def_literal)
+                    # Get rdfs:comment values (fallback, don't overwrite definition)
+                    for comment_literal in context.objects(prop_uri, RDFS.comment):
+                        lang = getattr(comment_literal, 'language', None) or ""
+                        if lang not in comments_dict:
+                            comments_dict[lang] = str(comment_literal)
+                    
+                    # Compute primary comment with fallback chain
+                    primary_comment = (
+                        find_by_lang(comments_dict, 'en') or
+                        comments_dict.get('') or
+                        (next(iter(comments_dict.values()), None) if comments_dict else None)
+                    )
 
                     # Get domain
                     domains = list(context.objects(prop_uri, RDFS.domain))
@@ -2209,8 +2242,10 @@ class SemanticModelsManager:
                     # Build property dict compatible with concept structure
                     prop_dict = {
                         "iri": prop_iri,
-                        "label": label,
-                        "comment": comment,
+                        "label": primary_label,
+                        "labels": labels_dict,  # All labels with language tags
+                        "comment": primary_comment,
+                        "comments": comments_dict,  # All comments with language tags
                         "concept_type": "property",  # For tree compatibility
                         "property_type": property_type,
                         "domain": domain,
