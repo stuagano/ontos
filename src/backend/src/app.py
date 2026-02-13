@@ -59,6 +59,7 @@ from src.routes import (
     projects_routes,
     costs_routes,
     workflows_routes,
+    training_data_routes,
 )
 
 from src.common.database import init_db, get_session_factory, SQLAlchemySession
@@ -218,6 +219,7 @@ openapi_tags = [
     {"name": "Estates", "description": "Manage data estates"},
     {"name": "Master Data Management", "description": "Master data management features"},
     {"name": "Catalog Commander", "description": "Dual-pane catalog explorer"},
+    {"name": "Training Data", "description": "ML training data curation and QA pair management"},
     
     # Security - Access control and security features
     {"name": "Security Features", "description": "Advanced security features"},
@@ -305,6 +307,7 @@ compliance_routes.register_routes(app)
 estate_manager_routes.register_routes(app)
 mdm_routes.register_routes(app)
 catalog_commander_routes.register_routes(app)
+training_data_routes.register_routes(app)
 
 # Security - Access control and security features
 security_features_routes.register_routes(app)

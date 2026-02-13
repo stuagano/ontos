@@ -47,6 +47,8 @@ import ProjectsView from './views/projects';
 import AuditTrail from './views/audit-trail';
 import WorkflowDesignerView from './views/workflow-designer';
 import Workflows from './views/workflows';
+import TrainingDataCuration from './views/training-data-curation';
+import TrainingCollectionDetails from './views/training-collection-details';
 
 export default function App() {
   const fetchUserInfo = useUserStore((state: any) => state.fetchUserInfo);
@@ -119,6 +121,8 @@ export default function App() {
               <Route path="/data-catalog" element={<DataCatalog />} />
               <Route path="/data-catalog/*" element={<DataCatalogDetails />} />
               <Route path="/audit" element={<AuditTrail />} />
+              <Route path="/training-data" element={<TrainingDataCuration />} />
+              <Route path="/training-data/collections/:collectionId" element={<TrainingCollectionDetails />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Layout>

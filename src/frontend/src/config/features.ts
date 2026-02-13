@@ -20,6 +20,7 @@ import {
     Package, // Icon for Data Products (matching marketplace)
     GitBranch, // Icon for Process Workflows
     BookOpen, // Icon for Data Catalog
+    GraduationCap, // Icon for Training Data
     type LucideIcon, // Import LucideIcon type
   } from 'lucide-react';
   
@@ -167,6 +168,16 @@ import {
       path: '/master-data',
       description: 'Build a golden record of your data.',
       icon: Users,
+      group: 'Operations',
+      maturity: 'beta',
+      showInLanding: true,
+    },
+    {
+      id: 'training-data',
+      name: 'Training Data',
+      path: '/training-data',
+      description: 'Curate ML training data collections and QA pairs.',
+      icon: GraduationCap,
       group: 'Operations',
       maturity: 'beta',
       showInLanding: true,
