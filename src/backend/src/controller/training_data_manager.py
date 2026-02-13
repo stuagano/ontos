@@ -17,13 +17,13 @@ from sqlalchemy.orm import Session
 
 from src.common.llm_service import LLMService
 from src.common.config import Settings
-from src.backend.src.connectors.unity_catalog_data_connector import (
+from src.connectors.unity_catalog_data_connector import (
     UnityCatalogDataConnector,
     DataFetchConfig,
     SamplingStrategy,
     create_connector_from_sheet,
 )
-from src.backend.src.db_models.training_data import (
+from src.db_models.training_data import (
     CanonicalLabelDb,
     ExampleStoreDb,
     ModelTrainingLineageDb,
@@ -37,7 +37,7 @@ from src.backend.src.db_models.training_data import (
     GenerationMethod,
     LabelType,
 )
-from src.backend.src.models.training_data import (
+from src.models.training_data import (
     CanonicalLabel,
     CanonicalLabelCreate,
     ChatMessage,
@@ -65,7 +65,7 @@ from src.backend.src.models.training_data import (
     TrainingCollectionCreate,
     TrainingDataGap,
 )
-from src.backend.src.repositories.training_data_repository import (
+from src.repositories.training_data_repository import (
     canonical_labels_repository,
     example_store_repository,
     model_training_lineage_repository,

@@ -21,11 +21,14 @@ import {
     GitBranch, // Icon for Process Workflows
     BookOpen, // Icon for Data Catalog
     GraduationCap, // Icon for Training Data
+    Rocket, // Icon for Model Deployment
+    Activity, // Icon for Model Monitoring
+    RefreshCcw, // Icon for Feedback & Improvement
     type LucideIcon, // Import LucideIcon type
   } from 'lucide-react';
   
   export type FeatureMaturity = 'ga' | 'beta' | 'alpha';
-  export type FeatureGroup = 'Data Products' | 'Governance' | 'Operations' | 'Security' | 'System';
+  export type FeatureGroup = 'Data Products' | 'Governance' | 'ML Lifecycle' | 'Operations' | 'Security' | 'System';
   
   export interface FeatureConfig {
     id: string; // Unique identifier, e.g., 'data-products'
@@ -172,14 +175,45 @@ import {
       maturity: 'beta',
       showInLanding: true,
     },
+    // ML Lifecycle - VITAL platform integration
     {
       id: 'training-data',
       name: 'Training Data',
       path: '/training-data',
-      description: 'Curate ML training data collections and QA pairs.',
+      description: 'Curate ML training data collections, labels, and QA pairs.',
       icon: GraduationCap,
-      group: 'Operations',
+      group: 'ML Lifecycle',
       maturity: 'beta',
+      showInLanding: true,
+    },
+    {
+      id: 'ml-deploy',
+      name: 'Deploy',
+      path: '/ml-deploy',
+      description: 'Deploy trained models to serving endpoints with testing playground.',
+      icon: Rocket,
+      group: 'ML Lifecycle',
+      maturity: 'alpha',
+      showInLanding: true,
+    },
+    {
+      id: 'ml-monitor',
+      name: 'Monitor',
+      path: '/ml-monitor',
+      description: 'Monitor model performance, latency, drift, and throughput.',
+      icon: Activity,
+      group: 'ML Lifecycle',
+      maturity: 'alpha',
+      showInLanding: true,
+    },
+    {
+      id: 'ml-improve',
+      name: 'Improve',
+      path: '/ml-improve',
+      description: 'Collect feedback, analyze gaps, and iterate on model quality.',
+      icon: RefreshCcw,
+      group: 'ML Lifecycle',
+      maturity: 'alpha',
       showInLanding: true,
     },
     {
@@ -293,7 +327,7 @@ import {
         });
   
       // Define the desired order of groups
-      const groupOrder: FeatureGroup[] = ['Data Products', 'Governance', 'Operations', 'Security', 'System'];
+      const groupOrder: FeatureGroup[] = ['Data Products', 'Governance', 'ML Lifecycle', 'Operations', 'Security', 'System'];
   
       // Sort groups according to the defined order
       return groupOrder

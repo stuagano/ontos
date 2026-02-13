@@ -17,14 +17,14 @@ from src.common.dependencies import DBSessionDep, AuditCurrentUserDep, AuditMana
 from src.common.features import FeatureAccessLevel
 from src.common.llm_service import LLMService
 from src.common.workspace_client import get_obo_workspace_client, get_workspace_client
-from src.backend.src.controller.training_data_manager import TrainingDataManager
-from src.backend.src.db_models.training_data import (
+from src.controller.training_data_manager import TrainingDataManager
+from src.db_models.training_data import (
     LabelType,
     QAPairReviewStatus,
     TemplateStatus,
     TrainingSheetStatus,
 )
-from src.backend.src.models.training_data import (
+from src.models.training_data import (
     CanonicalLabel,
     CanonicalLabelCreate,
     CanonicalLabelUpdate,
@@ -176,8 +176,8 @@ async def validate_sheet_source(
     _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_ONLY))
 ):
     """Validate that sheet's data source exists and is accessible"""
-    from src.backend.src.connectors.unity_catalog_data_connector import create_connector_from_sheet
-    from src.backend.src.repositories.training_data_repository import sheets_repository
+    from src.connectors.unity_catalog_data_connector import create_connector_from_sheet
+    from src.repositories.training_data_repository import sheets_repository
 
     sheet = sheets_repository.get(manager._db, sheet_id)
     if not sheet:
@@ -225,8 +225,8 @@ async def preview_sheet_data(
     _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_ONLY))
 ):
     """Preview a sample of data from the sheet's source"""
-    from src.backend.src.connectors.unity_catalog_data_connector import create_connector_from_sheet
-    from src.backend.src.repositories.training_data_repository import sheets_repository
+    from src.connectors.unity_catalog_data_connector import create_connector_from_sheet
+    from src.repositories.training_data_repository import sheets_repository
 
     sheet = sheets_repository.get(manager._db, sheet_id)
     if not sheet:

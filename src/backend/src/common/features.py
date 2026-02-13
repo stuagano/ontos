@@ -166,6 +166,23 @@ APP_FEATURES: Dict[str, Dict[str, str | List[FeatureAccessLevel]]] = {
     },
     # 'about': { ... } # About page doesn't need explicit permissions here
 
+    # ML Lifecycle (VITAL integration)
+    'training-data': {
+        'name': 'Training Data',
+        'allowed_levels': READ_WRITE_ADMIN_LEVELS
+    },
+    'ml-deploy': {
+        'name': 'Model Deployment',
+        'allowed_levels': READ_WRITE_ADMIN_LEVELS
+    },
+    'ml-monitor': {
+        'name': 'Model Monitoring',
+        'allowed_levels': READ_WRITE_ADMIN_LEVELS
+    },
+    'ml-improve': {
+        'name': 'Feedback & Improvement',
+        'allowed_levels': READ_WRITE_ADMIN_LEVELS
+    },
 }
 
 def get_feature_config() -> Dict[str, Dict[str, str | List[FeatureAccessLevel]]]:

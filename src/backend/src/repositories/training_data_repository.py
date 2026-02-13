@@ -14,7 +14,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 
 from src.common.repository import CRUDBase
-from src.backend.src.db_models.training_data import (
+from src.db_models.training_data import (
     CanonicalLabelDb,
     ExampleStoreDb,
     ModelTrainingLineageDb,
@@ -27,7 +27,7 @@ from src.backend.src.db_models.training_data import (
     TrainingSheetStatus,
     LabelType,
 )
-from src.backend.src.models.training_data import (
+from src.models.training_data import (
     CanonicalLabelCreate,
     ExampleCreate,
     ModelLineageCreate,

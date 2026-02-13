@@ -49,6 +49,9 @@ import WorkflowDesignerView from './views/workflow-designer';
 import Workflows from './views/workflows';
 import TrainingDataCuration from './views/training-data-curation';
 import TrainingCollectionDetails from './views/training-collection-details';
+import MlDeploy from './views/ml-deploy';
+import MlMonitor from './views/ml-monitor';
+import MlImprove from './views/ml-improve';
 
 export default function App() {
   const fetchUserInfo = useUserStore((state: any) => state.fetchUserInfo);
@@ -123,6 +126,9 @@ export default function App() {
               <Route path="/audit" element={<AuditTrail />} />
               <Route path="/training-data" element={<TrainingDataCuration />} />
               <Route path="/training-data/collections/:collectionId" element={<TrainingCollectionDetails />} />
+              <Route path="/ml-deploy" element={<MlDeploy />} />
+              <Route path="/ml-monitor" element={<MlMonitor />} />
+              <Route path="/ml-improve" element={<MlImprove />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Layout>
