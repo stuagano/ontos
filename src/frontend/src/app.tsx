@@ -52,6 +52,13 @@ import TrainingCollectionDetails from './views/training-collection-details';
 import MlDeploy from './views/ml-deploy';
 import MlMonitor from './views/ml-monitor';
 import MlImprove from './views/ml-improve';
+import MlTemplateBuilder from './views/ml-template-builder';
+import MlSheetBuilder from './views/ml-sheet-builder';
+import MlLabelSets from './views/ml-label-sets';
+import MlCurate from './views/ml-curate';
+import MlTrain from './views/ml-train';
+import MlDspy from './views/ml-dspy';
+import MlExamples from './views/ml-examples';
 
 export default function App() {
   const fetchUserInfo = useUserStore((state: any) => state.fetchUserInfo);
@@ -129,6 +136,13 @@ export default function App() {
               <Route path="/ml-deploy" element={<MlDeploy />} />
               <Route path="/ml-monitor" element={<MlMonitor />} />
               <Route path="/ml-improve" element={<MlImprove />} />
+              <Route path="/ml-templates" element={<MlTemplateBuilder />} />
+              <Route path="/ml-sheets" element={<MlSheetBuilder />} />
+              <Route path="/ml-labels" element={<MlLabelSets />} />
+              <Route path="/ml-curate" element={<MlCurate />} />
+              <Route path="/ml-train" element={<MlTrain />} />
+              <Route path="/ml-dspy" element={<MlDspy />} />
+              <Route path="/ml-examples" element={<MlExamples />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Layout>

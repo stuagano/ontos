@@ -24,6 +24,13 @@ import {
     Rocket, // Icon for Model Deployment
     Activity, // Icon for Model Monitoring
     RefreshCcw, // Icon for Feedback & Improvement
+    Wand2, // Icon for Prompt Templates
+    FileSpreadsheet, // Icon for Sheet Builder
+    Tag, // Icon for Canonical Labels
+    ClipboardList, // Icon for Curate & Review
+    Dumbbell, // Icon for Training Jobs
+    Zap, // Icon for DSPy Optimization
+    Lightbulb, // Icon for Example Store
     type LucideIcon, // Import LucideIcon type
   } from 'lucide-react';
   
@@ -215,6 +222,76 @@ import {
       group: 'ML Lifecycle',
       maturity: 'alpha',
       showInLanding: true,
+    },
+    {
+      id: 'ml-templates',
+      name: 'Templates',
+      path: '/ml-templates',
+      description: 'Build and manage prompt templates for ML data generation.',
+      icon: Wand2,
+      group: 'ML Lifecycle',
+      maturity: 'alpha',
+      showInLanding: false,
+    },
+    {
+      id: 'ml-sheets',
+      name: 'Sheets',
+      path: '/ml-sheets',
+      description: 'Define dataset sources from Unity Catalog with column mapping.',
+      icon: FileSpreadsheet,
+      group: 'ML Lifecycle',
+      maturity: 'alpha',
+      showInLanding: false,
+    },
+    {
+      id: 'ml-labels',
+      name: 'Labels',
+      path: '/ml-labels',
+      description: 'Manage canonical labels for expert-validated ground truth.',
+      icon: Tag,
+      group: 'ML Lifecycle',
+      maturity: 'alpha',
+      showInLanding: false,
+    },
+    {
+      id: 'ml-curate',
+      name: 'Curate',
+      path: '/ml-curate',
+      description: 'Review and label Q&A pairs in training collections.',
+      icon: ClipboardList,
+      group: 'ML Lifecycle',
+      maturity: 'alpha',
+      showInLanding: false,
+    },
+    {
+      id: 'ml-train',
+      name: 'Train',
+      path: '/ml-train',
+      description: 'Configure and monitor model fine-tuning jobs.',
+      icon: Dumbbell,
+      group: 'ML Lifecycle',
+      maturity: 'alpha',
+      showInLanding: false,
+    },
+    {
+      id: 'ml-dspy',
+      name: 'DSPy Optimizer',
+      path: '/ml-dspy',
+      description: 'Automatically optimize prompt templates with DSPy.',
+      icon: Zap,
+      group: 'ML Lifecycle',
+      maturity: 'alpha',
+      showInLanding: false,
+    },
+    {
+      id: 'ml-examples',
+      name: 'Example Store',
+      path: '/ml-examples',
+      description: 'Manage few-shot learning examples for DSPy and inference.',
+      icon: Lightbulb,
+      group: 'ML Lifecycle',
+      maturity: 'alpha',
+      showInLanding: false,
     },
     {
       id: 'catalog-commander',

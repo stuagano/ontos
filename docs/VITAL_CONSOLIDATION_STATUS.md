@@ -27,7 +27,7 @@ Consolidate VITAL Workbench's ML lifecycle features into Ontos rather than runni
 
 ---
 
-## Phase 2: Core UI Port — IN PROGRESS
+## Phase 2: Core UI Port — DONE
 
 > Port VITAL's stage pages + TOOLS pages into Ontos as new views. Adapt to Ontos patterns (useApi, Shadcn, permissions, breadcrumbs).
 
@@ -35,34 +35,54 @@ Consolidate VITAL Workbench's ML lifecycle features into Ontos rather than runni
 
 | View | File | LOC | Source (VITAL) | Notes |
 |------|------|-----|----------------|-------|
-| **Deploy** | `src/frontend/src/views/ml-deploy.tsx` | ~420 | `DeployPage.tsx` (897) | 3-step deployment wizard (select model → version → configure). Endpoints table with status badges. Playground dialog for testing queries. Uses Shadcn Dialog, Switch, Select. |
-| **Monitor** | `src/frontend/src/views/ml-monitor.tsx` | ~310 | `MonitorPage.tsx` (1081) | Metrics summary cards (endpoints, req/min, latency, alerts). Two tabs: endpoint metrics table + drift alerts table. Time range selector (1h/24h/7d/30d). |
-| **Improve** | `src/frontend/src/views/ml-improve.tsx` | ~310 | `ImprovePage.tsx` (475) | Feedback table with thumbs up/down, add-to-training action. Stats cards. Gap analysis cards with severity colors. Improvement workflow steps. |
-| **Routes** | `src/frontend/src/app.tsx` | +6 | — | Added `/ml-deploy`, `/ml-monitor`, `/ml-improve` routes with imports. |
+| **Deploy** | `views/ml-deploy.tsx` | ~420 | `DeployPage.tsx` (897) | 3-step deployment wizard. Endpoints table. Playground dialog. |
+| **Monitor** | `views/ml-monitor.tsx` | ~310 | `MonitorPage.tsx` (1081) | Metrics cards. Endpoint metrics + drift alerts tables. Time range selector. |
+| **Improve** | `views/ml-improve.tsx` | ~310 | `ImprovePage.tsx` (475) | Feedback table. Gap analysis cards. Improvement workflow. |
+| **Templates** | `views/ml-template-builder.tsx` | ~480 | `TemplateBuilderPage.tsx` (1306) | Template list + create/edit dialog. System/user prompt editors. Output schema. Model settings. Live preview. |
+| **Sheets** | `views/ml-sheet-builder.tsx` | ~470 | `SheetBuilder.tsx` (1725) | Sheet list + create dialog. UC source config. Column spec. Data preview + validation. |
+| **Labels** | `views/ml-label-sets.tsx` | ~460 | `LabelSetsPage.tsx` (620) | Canonical label list with type filter. Create dialog. Detail dialog with usage info. |
+| **Curate** | `views/ml-curate.tsx` | ~480 | `CuratePage.tsx` (1629) | Collection browser. QA pair grid/list with detail panel. Status filter. Keyboard nav. Stats bar. |
+| **Train** | `views/ml-train.tsx` | ~430 | `TrainPage.tsx` (572) | Training jobs list. Collection selection. Job config form. Job detail with progress/results. |
+| **DSPy** | `views/ml-dspy.tsx` | ~430 | `DSPyOptimizationPage.tsx` (729) | Template selection. Optimization config panel. Run progress monitoring. Results with sync. Code export tab. |
+| **Examples** | `views/ml-examples.tsx` | ~420 | `ExampleStorePage.tsx` (637) | Example cards with effectiveness scores. Domain/difficulty filters. Create/edit dialog. Top performers sidebar. |
 
-All three views:
-- Follow Ontos's exact pattern: `useApi`, `usePermissions`, `useBreadcrumbStore`, Shadcn `DataTable`, `checkApiResponse`
-- Gracefully handle 404 errors (backend not yet ported) with informational alerts
-- Support RBAC via the `ml-deploy`/`ml-monitor`/`ml-improve` feature IDs registered in Phase 1
+**Total:** 10 views ported (~4,210 LOC) from 10 VITAL pages (~8,171 LOC) — 51% compression ratio.
 
-### Remaining (Phase 2)
+All views follow Ontos patterns:
+- `useApi` for HTTP, `usePermissions` for RBAC, `useBreadcrumbStore` for navigation
+- Shadcn `DataTable` (TanStack Table), `Dialog`, `Card`, `Badge`, `Button`
+- `checkApiResponse` helper with graceful 404 handling
+- Guard pattern: loading → permission → error → content
+- `useTranslation` ready for i18n
 
-These are the VITAL pages NOT yet ported. Ordered by value:
+### Routes Added to `app.tsx`
 
-| View to Port | Source (VITAL) | LOC | Depends On | Priority |
-|-------------|----------------|-----|------------|----------|
-| **TemplateBuilder** | `TemplateBuilderPage.tsx` | 1306 | Existing `/api/training-data/templates` | High — rich syntax highlighting, variable preview, reusable IP editor |
-| **SheetBuilder** | `SheetBuilder.tsx` | ~600 | Existing `/api/training-data/sheets` | High — UC table browser, column mapping, sampling config |
-| **LabelSetsPage** (Canonical Labels) | `LabelSetsPage.tsx` | ~500 | Existing `/api/training-data/canonical-labels` | High — label management, verification, image annotation |
-| **CuratePage** (enhanced) | `CuratePage.tsx` | 1629 | Existing `/api/training-data/collections` | Medium — multi-user labeling, task board. Existing `training-data-curation.tsx` partially covers this. |
-| **TrainPage** | `TrainPage.tsx` | 572 | New backend routes (Phase 3) | Medium — model fine-tuning config, training job management |
-| **DSPyOptimizationPage** | `DSPyOptimizationPage.tsx` | 646+729 | New backend routes (Phase 3) | Medium — automated prompt optimization |
-| **ExampleStorePage** | `ExampleStorePage.tsx` | 637 | Existing `/api/training-data/examples` (partial) | Low — few-shot example management, effectiveness dashboard |
-| **DataQualityPage** | `DataQualityPage.tsx` | ~400 | DQX iframe | Low — embedded DQX integration |
-| **LabelingJobsPage** | `LabelingJobsPage.tsx` | 1099 | New backend routes | Low — multi-user labeling task board |
-| **ExampleEffectivenessDashboard** | `ExampleEffectivenessDashboard.tsx` | ~400 | New backend routes | Low — DSPy effectiveness metrics |
+| Route | View |
+|-------|------|
+| `/ml-deploy` | MlDeploy |
+| `/ml-monitor` | MlMonitor |
+| `/ml-improve` | MlImprove |
+| `/ml-templates` | MlTemplateBuilder |
+| `/ml-sheets` | MlSheetBuilder |
+| `/ml-labels` | MlLabelSets |
+| `/ml-curate` | MlCurate |
+| `/ml-train` | MlTrain |
+| `/ml-dspy` | MlDspy |
+| `/ml-examples` | MlExamples |
 
-**Estimated remaining effort:** 3-4 weeks (plan original estimate)
+### Features Added to `features.ts`
+
+All registered under `ML Lifecycle` group with `maturity: 'alpha'`:
+- `ml-deploy`, `ml-monitor`, `ml-improve` (showInLanding: true)
+- `ml-templates`, `ml-sheets`, `ml-labels`, `ml-curate`, `ml-train`, `ml-dspy`, `ml-examples` (showInLanding: false)
+
+### Not Ported (Deferred to Phase 5)
+
+| View | Reason |
+|------|--------|
+| **DataQualityPage** | DQX iframe integration — needs DQX endpoint configuration |
+| **LabelingJobsPage** | Multi-user labeling task board — needs new backend routes (Phase 3) |
+| **ExampleEffectivenessDashboard** | DSPy effectiveness metrics — needs backend analytics endpoints |
 
 ---
 
@@ -79,6 +99,8 @@ These are the VITAL pages NOT yet ported. Ordered by value:
 | **Feedback Service** | Part of VITAL's API routes | `src/backend/src/controller/feedback_manager.py` | New `feedback_items` table |
 | **Gap Analysis Service** | `backend/app/services/gap_analysis_service.py` | `src/backend/src/controller/gap_analysis_manager.py` | Feedback + training data tables |
 | **DSPy Integration** | `backend/app/services/dspy_integration_service.py` | `src/backend/src/controller/dspy_manager.py` | DSPy library, LLMService |
+| **Training Job Service** | Part of VITAL's API routes | New routes in `training_data_routes.py` | Databricks Jobs SDK |
+| **Example Store Service** | Part of VITAL's API routes | New routes in `training_data_routes.py` | Existing example_store DB model |
 
 ### New API Routes Needed
 
@@ -87,6 +109,10 @@ These are the VITAL pages NOT yet ported. Ordered by value:
 | `/api/ml-deploy` | `GET /models`, `GET /models/{name}/versions`, `POST /deploy`, `GET /endpoints`, `POST /endpoints/{name}/query` | ml-deploy.tsx |
 | `/api/ml-monitor` | `GET /metrics`, `GET /alerts`, `POST /alerts/{id}/acknowledge` | ml-monitor.tsx |
 | `/api/ml-improve` | `GET /feedback`, `GET /feedback/stats`, `GET /gaps`, `POST /feedback/{id}/convert` | ml-improve.tsx |
+| `/api/training-data/training-jobs` | `GET /`, `POST /`, `GET /{id}` | ml-train.tsx |
+| `/api/training-data/dspy` | `POST /export/{id}`, `POST /runs`, `GET /runs/{id}`, `POST /runs/{id}/cancel`, `POST /runs/{id}/sync` | ml-dspy.tsx |
+| `/api/training-data/examples` | `GET /`, `GET /top`, `POST /`, `PUT /{id}`, `DELETE /{id}` | ml-examples.tsx |
+| `/api/training-data/collections/{id}/qa-pairs` | `GET /`, `PUT /{pairId}` | ml-curate.tsx |
 
 ### New DB Tables (Alembic Migrations)
 
@@ -96,6 +122,7 @@ These are the VITAL pages NOT yet ported. Ordered by value:
 | `drift_alerts` | Drift detection alerts |
 | `improvement_cycles` | Track improvement iterations |
 | `dspy_optimization_runs` | DSPy optimization history |
+| `training_jobs` | Model fine-tuning job tracking |
 
 **Estimated effort:** 2-3 weeks
 
@@ -127,6 +154,7 @@ These are the VITAL pages NOT yet ported. Ordered by value:
 - Port synthetic data generators for Mirion use cases
 - Add keyboard shortcuts (Alt+T, Alt+E, Alt+D)
 - Port module/plugin system
+- Port remaining views: DataQualityPage, LabelingJobsPage, ExampleEffectivenessDashboard
 
 **Estimated effort:** 1-2 weeks
 
@@ -153,47 +181,27 @@ These are the VITAL pages NOT yet ported. Ordered by value:
 ### Ontos Files Modified
 
 ```
-src/backend/src/common/features.py                     # Phase 1: +training-data, +ml-deploy/monitor/improve
-src/backend/src/controller/training_data_manager.py     # Phase 1: fixed imports
+src/backend/src/common/features.py                      # Phase 1: +training-data, +ml-deploy/monitor/improve
+src/backend/src/controller/training_data_manager.py      # Phase 1: fixed imports
 src/backend/src/repositories/training_data_repository.py # Phase 1: fixed imports
-src/backend/src/routes/training_data_routes.py          # Phase 1: fixed imports
-src/frontend/src/config/features.ts                     # Phase 1: +ML Lifecycle group
-src/frontend/src/app.tsx                                # Phase 2: +3 routes
+src/backend/src/routes/training_data_routes.py           # Phase 1: fixed imports
+src/frontend/src/config/features.ts                      # Phase 1+2: +ML Lifecycle group, +10 features
+src/frontend/src/app.tsx                                 # Phase 2: +10 routes, +10 imports
 ```
 
 ### Ontos Files Created
 
 ```
-src/frontend/src/views/ml-deploy.tsx     # Phase 2: Deploy view (~420 LOC)
-src/frontend/src/views/ml-monitor.tsx    # Phase 2: Monitor view (~310 LOC)
-src/frontend/src/views/ml-improve.tsx    # Phase 2: Improve view (~310 LOC)
-```
-
-### VITAL Source Files (Port From)
-
-```
-# Pages (Phase 2 remaining)
-mirion-vital-workbench/frontend/src/pages/TemplateBuilderPage.tsx   (1306 LOC)
-mirion-vital-workbench/frontend/src/pages/SheetBuilder.tsx          (~600 LOC)
-mirion-vital-workbench/frontend/src/pages/LabelSetsPage.tsx         (~500 LOC)
-mirion-vital-workbench/frontend/src/pages/CuratePage.tsx            (1629 LOC)
-mirion-vital-workbench/frontend/src/pages/TrainPage.tsx             (572 LOC)
-mirion-vital-workbench/frontend/src/pages/DSPyOptimizationPage.tsx  (646 LOC)
-mirion-vital-workbench/frontend/src/pages/ExampleStorePage.tsx      (637 LOC)
-mirion-vital-workbench/frontend/src/pages/DataQualityPage.tsx       (~400 LOC)
-mirion-vital-workbench/frontend/src/pages/LabelingJobsPage.tsx      (1099 LOC)
-
-# Backend services (Phase 3)
-mirion-vital-workbench/backend/app/services/deployment_service.py
-mirion-vital-workbench/backend/app/services/monitoring_service.py
-mirion-vital-workbench/backend/app/services/gap_analysis_service.py
-mirion-vital-workbench/backend/app/services/dspy_integration_service.py
-
-# Components to adapt (shared)
-mirion-vital-workbench/frontend/src/components/PipelineBreadcrumb.tsx  (144 LOC)
-mirion-vital-workbench/frontend/src/components/WorkflowBanner.tsx      (174 LOC)
-mirion-vital-workbench/frontend/src/context/WorkflowContext.tsx        (527 LOC)
-mirion-vital-workbench/frontend/src/components/DataTable.tsx           (244 LOC)
+src/frontend/src/views/ml-deploy.tsx           # Phase 2: Deploy view (~420 LOC)
+src/frontend/src/views/ml-monitor.tsx          # Phase 2: Monitor view (~310 LOC)
+src/frontend/src/views/ml-improve.tsx          # Phase 2: Improve view (~310 LOC)
+src/frontend/src/views/ml-template-builder.tsx # Phase 2: Template Builder (~480 LOC)
+src/frontend/src/views/ml-sheet-builder.tsx    # Phase 2: Sheet Builder (~470 LOC)
+src/frontend/src/views/ml-label-sets.tsx       # Phase 2: Label Sets (~460 LOC)
+src/frontend/src/views/ml-curate.tsx           # Phase 2: Curate & Review (~480 LOC)
+src/frontend/src/views/ml-train.tsx            # Phase 2: Training Jobs (~430 LOC)
+src/frontend/src/views/ml-dspy.tsx             # Phase 2: DSPy Optimizer (~430 LOC)
+src/frontend/src/views/ml-examples.tsx         # Phase 2: Example Store (~420 LOC)
 ```
 
 ### Key Pattern Differences (Porting Guide)
