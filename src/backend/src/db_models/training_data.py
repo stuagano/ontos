@@ -28,7 +28,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSON, UUID as PG_UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
-from src.common.db import Base
+from src.common.database import Base
 
 
 # =============================================================================
@@ -480,6 +480,161 @@ class QAPairDb(Base):
 
 
 # =============================================================================
+# TRAINING JOBS - Fine-tuning job tracking
+# =============================================================================
+
+class TrainingJobStatus(str, enum.Enum):
+    """Status for training jobs"""
+    PENDING = "pending"
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class TrainingJobDb(Base):
+    """
+    Training Job: Tracks fine-tuning jobs submitted via Foundation Model APIs.
+
+    Links to a training collection and records progress, metrics, and results.
+    """
+    __tablename__ = "training_jobs"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # Source collection
+    collection_id = Column(PG_UUID(as_uuid=True), ForeignKey("training_collections.id", ondelete="SET NULL"), nullable=True)
+
+    # Model configuration
+    model_name = Column(String(255), nullable=False)
+    base_model = Column(String(255), nullable=True)
+
+    # Status tracking
+    status = Column(
+        Enum(TrainingJobStatus, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        default=TrainingJobStatus.PENDING
+    )
+
+    # Training configuration
+    training_config = Column(JSON, nullable=True)  # epochs, batch_size, learning_rate, etc.
+    train_val_split = Column(Float, nullable=True, default=0.8)
+
+    # Pair counts
+    total_pairs = Column(Integer, nullable=True)
+    train_pairs = Column(Integer, nullable=True)
+    val_pairs = Column(Integer, nullable=True)
+
+    # Progress tracking
+    progress_percent = Column(Float, nullable=True, default=0.0)
+    current_epoch = Column(Integer, nullable=True)
+    total_epochs = Column(Integer, nullable=True)
+
+    # Metrics
+    best_metric = Column(Float, nullable=True)
+    metric_name = Column(String(100), nullable=True)
+
+    # External IDs
+    fmapi_job_id = Column(String(255), nullable=True)  # Foundation Model API job ID
+    mlflow_run_id = Column(String(255), nullable=True)
+
+    # Error handling
+    error_message = Column(Text, nullable=True)
+
+    # Timestamps
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Audit
+    created_by = Column(String(255), nullable=True)
+    updated_by = Column(String(255), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    # Relationships
+    collection = relationship("TrainingCollectionDb")
+
+    __table_args__ = (
+        Index("ix_training_jobs_status", "status"),
+        Index("ix_training_jobs_collection", "collection_id"),
+        Index("ix_training_jobs_fmapi", "fmapi_job_id"),
+    )
+
+
+# =============================================================================
+# DSPY OPTIMIZATION RUNS
+# =============================================================================
+
+class DSPyRunStatus(str, enum.Enum):
+    """Status for DSPy optimization runs"""
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class DSPyOptimizationRunDb(Base):
+    """
+    DSPy Optimization Run: Tracks DSPy prompt optimization runs.
+
+    Persisted to DB (unlike VITAL's in-memory approach) for restart resilience.
+    """
+    __tablename__ = "dspy_optimization_runs"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # Source template
+    template_id = Column(PG_UUID(as_uuid=True), ForeignKey("prompt_templates.id", ondelete="SET NULL"), nullable=True)
+
+    # Program configuration
+    program_name = Column(String(255), nullable=False)
+    signature_name = Column(String(255), nullable=True)
+
+    # Status
+    status = Column(
+        Enum(DSPyRunStatus, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        default=DSPyRunStatus.PENDING
+    )
+
+    # Optimizer configuration
+    optimizer_type = Column(String(100), nullable=True)  # BootstrapFewShot, MIPRO, etc.
+    config = Column(JSON, nullable=True)  # optimizer-specific config
+
+    # Progress
+    trials_completed = Column(Integer, nullable=True, default=0)
+    trials_total = Column(Integer, nullable=True)
+
+    # Results
+    best_score = Column(Float, nullable=True)
+    results = Column(JSON, nullable=True)  # Full optimization results
+    top_example_ids = Column(ARRAY(String), nullable=True, default=[])
+
+    # Error handling
+    error_message = Column(Text, nullable=True)
+
+    # Timestamps
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Audit
+    created_by = Column(String(255), nullable=True)
+    updated_by = Column(String(255), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    # Relationships
+    template = relationship("PromptTemplateDb")
+
+    __table_args__ = (
+        Index("ix_dspy_runs_status", "status"),
+        Index("ix_dspy_runs_template", "template_id"),
+    )
+
+
+# =============================================================================
 # EXAMPLE STORE - Few-shot examples with embeddings
 # =============================================================================
 
@@ -531,6 +686,115 @@ class ExampleStoreDb(Base):
         Index("ix_example_store_domain_task", "domain", "task_type"),
         Index("ix_example_store_function", "function_name"),
         Index("ix_example_store_verified", "is_verified"),
+    )
+
+
+# =============================================================================
+# ML FEEDBACK ITEMS - User feedback on model predictions
+# =============================================================================
+
+class FeedbackItemDb(Base):
+    """
+    Feedback Item: User feedback on model predictions for improvement loop.
+
+    Tracks queries, responses, ratings, and optional conversion to training pairs.
+    """
+    __tablename__ = "ml_feedback_items"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # Model context
+    model_name = Column(String(255), nullable=False, index=True)
+    endpoint_name = Column(String(255), nullable=True)
+
+    # The interaction
+    query = Column(Text, nullable=False)
+    response = Column(Text, nullable=False)
+
+    # Rating
+    rating = Column(Integer, nullable=True)  # 1-5
+    feedback_type = Column(String(100), nullable=True)  # positive, negative, neutral
+    category = Column(String(255), nullable=True)  # hallucination, incomplete, wrong_format, etc.
+    comment = Column(Text, nullable=True)
+
+    # Conversion to training data
+    is_converted = Column(Boolean, nullable=False, default=False)
+    converted_to_pair_id = Column(PG_UUID(as_uuid=True), ForeignKey("qa_pairs.id", ondelete="SET NULL"), nullable=True)
+
+    # Audit
+    created_by = Column(String(255), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index("ix_feedback_model", "model_name"),
+        Index("ix_feedback_rating", "rating"),
+        Index("ix_feedback_converted", "is_converted"),
+    )
+
+
+# =============================================================================
+# ML IDENTIFIED GAPS - Systematic gaps in model coverage
+# =============================================================================
+
+class GapSeverity(str, enum.Enum):
+    """Severity of identified gap"""
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+class GapStatus(str, enum.Enum):
+    """Status of gap remediation"""
+    IDENTIFIED = "identified"
+    IN_PROGRESS = "in_progress"
+    RESOLVED = "resolved"
+    WONT_FIX = "wont_fix"
+
+
+class GapRecordDb(Base):
+    """
+    Gap Record: Identified gap in model coverage or quality.
+
+    Tracks systematic issues found through monitoring, feedback analysis,
+    or manual review with suggested remediation actions.
+    """
+    __tablename__ = "ml_identified_gaps"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # Gap details
+    gap_type = Column(String(100), nullable=False)  # coverage, quality, distribution, drift
+    severity = Column(
+        Enum(GapSeverity, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        default=GapSeverity.MEDIUM
+    )
+    description = Column(Text, nullable=False)
+
+    # Context
+    model_name = Column(String(255), nullable=True)
+    template_id = Column(PG_UUID(as_uuid=True), ForeignKey("prompt_templates.id", ondelete="SET NULL"), nullable=True)
+    affected_queries_count = Column(Integer, nullable=True)
+    error_rate = Column(Float, nullable=True)
+
+    # Remediation
+    suggested_action = Column(Text, nullable=True)
+    estimated_records_needed = Column(Integer, nullable=True)
+    status = Column(
+        Enum(GapStatus, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        default=GapStatus.IDENTIFIED
+    )
+    priority = Column(Integer, nullable=True, default=0)
+
+    # Audit
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index("ix_gaps_severity", "severity"),
+        Index("ix_gaps_status", "status"),
+        Index("ix_gaps_model", "model_name"),
     )
 
 

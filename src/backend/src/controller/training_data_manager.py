@@ -25,6 +25,8 @@ from src.connectors.unity_catalog_data_connector import (
 )
 from src.db_models.training_data import (
     CanonicalLabelDb,
+    DSPyOptimizationRunDb,
+    DSPyRunStatus,
     ExampleStoreDb,
     ModelTrainingLineageDb,
     PromptTemplateDb,
@@ -33,6 +35,8 @@ from src.db_models.training_data import (
     SheetDb,
     TemplateStatus,
     TrainingCollectionDb,
+    TrainingJobDb,
+    TrainingJobStatus,
     TrainingSheetStatus,
     GenerationMethod,
     LabelType,
@@ -40,11 +44,17 @@ from src.db_models.training_data import (
 from src.models.training_data import (
     CanonicalLabel,
     CanonicalLabelCreate,
+    CanonicalLabelUpdate,
     ChatMessage,
+    DSPyExportRequest,
+    DSPyExportResult,
+    DSPyRun,
+    DSPyRunCreate,
     Example,
     ExampleCreate,
     ExampleSearchQuery,
     ExampleSearchResult,
+    ExampleUpdate,
     ExportFormat,
     ExportRequest,
     ExportResult,
@@ -55,24 +65,31 @@ from src.models.training_data import (
     ModelLineageCreate,
     PromptTemplate,
     PromptTemplateCreate,
+    PromptTemplateUpdate,
     QAPair,
     QAPairCreate,
     QAPairBulkReview,
+    QAPairUpdate,
     QAPairsByConceptQuery,
     Sheet,
     SheetCreate,
+    SheetUpdate,
     TrainingCollection,
     TrainingCollectionCreate,
     TrainingDataGap,
+    TrainingJob,
+    TrainingJobCreate,
 )
 from src.repositories.training_data_repository import (
     canonical_labels_repository,
+    dspy_runs_repository,
     example_store_repository,
     model_training_lineage_repository,
     prompt_templates_repository,
     qa_pairs_repository,
     sheets_repository,
     training_collections_repository,
+    training_jobs_repository,
 )
 
 logger = logging.getLogger(__name__)
@@ -134,6 +151,30 @@ class TrainingDataManager:
         db_objs = sheets_repository.list_all(self._db, skip=skip, limit=limit, owner_id=owner_id)
         return [self._sheet_to_api(obj) for obj in db_objs]
 
+    def update_sheet(
+        self,
+        sheet_id: UUID,
+        payload: SheetUpdate,
+        updated_by: Optional[str] = None
+    ) -> Optional[Sheet]:
+        """Update a sheet"""
+        db_obj = sheets_repository.get(self._db, sheet_id)
+        if not db_obj:
+            return None
+        update_data = payload.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_obj, field, value)
+        db_obj.updated_by = updated_by
+        self._db.add(db_obj)
+        self._db.flush()
+        self._db.refresh(db_obj)
+        return self._sheet_to_api(db_obj)
+
+    def delete_sheet(self, sheet_id: UUID) -> bool:
+        """Delete a sheet"""
+        result = sheets_repository.remove(self._db, id=sheet_id)
+        return result is not None
+
     def _sheet_to_api(self, db_obj: SheetDb) -> Sheet:
         """Convert DB sheet to API model"""
         return Sheet.model_validate(db_obj)
@@ -172,6 +213,30 @@ class TrainingDataManager:
         else:
             db_objs = self._db.query(PromptTemplateDb).offset(skip).limit(limit).all()
         return [self._template_to_api(obj) for obj in db_objs]
+
+    def update_template(
+        self,
+        template_id: UUID,
+        payload: PromptTemplateUpdate,
+        updated_by: Optional[str] = None
+    ) -> Optional[PromptTemplate]:
+        """Update a prompt template"""
+        db_obj = prompt_templates_repository.get(self._db, template_id)
+        if not db_obj:
+            return None
+        update_data = payload.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_obj, field, value)
+        db_obj.updated_by = updated_by
+        self._db.add(db_obj)
+        self._db.flush()
+        self._db.refresh(db_obj)
+        return self._template_to_api(db_obj)
+
+    def delete_template(self, template_id: UUID) -> bool:
+        """Delete a prompt template"""
+        result = prompt_templates_repository.remove(self._db, id=template_id)
+        return result is not None
 
     def render_template(
         self,
@@ -272,6 +337,52 @@ class TrainingDataManager:
         self._db.flush()
         self._db.refresh(db_obj)
         return self._canonical_label_to_api(db_obj)
+
+    def list_canonical_labels(
+        self,
+        sheet_id: Optional[UUID] = None,
+        label_type: Optional[LabelType] = None,
+        only_verified: bool = False,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[CanonicalLabel]:
+        """List canonical labels with optional filters"""
+        if sheet_id:
+            db_objs = canonical_labels_repository.list_for_sheet(
+                self._db, sheet_id, label_type=label_type, only_verified=only_verified, skip=skip, limit=limit
+            )
+        else:
+            query = self._db.query(CanonicalLabelDb)
+            if label_type:
+                query = query.filter(CanonicalLabelDb.label_type == label_type)
+            if only_verified:
+                query = query.filter(CanonicalLabelDb.is_verified == True)
+            db_objs = query.offset(skip).limit(limit).all()
+        return [self._canonical_label_to_api(obj) for obj in db_objs]
+
+    def update_canonical_label(
+        self,
+        label_id: UUID,
+        payload: CanonicalLabelUpdate,
+        updated_by: Optional[str] = None
+    ) -> Optional[CanonicalLabel]:
+        """Update a canonical label"""
+        db_obj = canonical_labels_repository.get(self._db, label_id)
+        if not db_obj:
+            return None
+        update_data = payload.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_obj, field, value)
+        db_obj.updated_by = updated_by
+        self._db.add(db_obj)
+        self._db.flush()
+        self._db.refresh(db_obj)
+        return self._canonical_label_to_api(db_obj)
+
+    def delete_canonical_label(self, label_id: UUID) -> bool:
+        """Delete a canonical label"""
+        result = canonical_labels_repository.remove(self._db, id=label_id)
+        return result is not None
 
     def _canonical_label_to_api(self, db_obj: CanonicalLabelDb) -> CanonicalLabel:
         """Convert DB canonical label to API model"""
@@ -744,6 +855,31 @@ class TrainingDataManager:
             self._db, collection_id, train_ratio, val_ratio, test_ratio
         )
 
+    def update_qa_pair(
+        self,
+        pair_id: UUID,
+        payload: QAPairUpdate,
+        updated_by: Optional[str] = None
+    ) -> Optional[QAPair]:
+        """Update a QA pair"""
+        db_obj = qa_pairs_repository.get(self._db, pair_id)
+        if not db_obj:
+            return None
+        update_data = payload.model_dump(exclude_unset=True)
+        # Handle messages specially (convert ChatMessage dicts)
+        if 'messages' in update_data and update_data['messages'] is not None:
+            update_data['messages'] = [
+                msg.model_dump() if hasattr(msg, 'model_dump') else msg
+                for msg in update_data['messages']
+            ]
+        for field, value in update_data.items():
+            setattr(db_obj, field, value)
+        db_obj.updated_by = updated_by
+        self._db.add(db_obj)
+        self._db.flush()
+        self._db.refresh(db_obj)
+        return self._qa_pair_to_api(db_obj)
+
     def _qa_pair_to_api(self, db_obj: QAPairDb) -> QAPair:
         """Convert DB QA pair to API model"""
         return QAPair.model_validate(db_obj)
@@ -930,6 +1066,81 @@ class TrainingDataManager:
         except Exception as e:
             logger.warning(f"Failed to get concepts: {e}")
             return []
+
+    # =========================================================================
+    # EXAMPLES
+    # =========================================================================
+
+    def list_examples(
+        self,
+        domain: Optional[str] = None,
+        task_type: Optional[str] = None,
+        difficulty: Optional[str] = None,
+        only_verified: bool = False,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[Example]:
+        """List examples with optional filters"""
+        db_objs = example_store_repository.search(
+            self._db,
+            domain=domain,
+            task_type=task_type,
+            difficulty=difficulty,
+            only_verified=only_verified,
+            limit=limit
+        )
+        return [Example.model_validate(obj) for obj in db_objs]
+
+    def get_top_examples(
+        self,
+        limit: int = 10,
+        domain: Optional[str] = None
+    ) -> List[Example]:
+        """Get top examples by effectiveness score"""
+        db_objs = example_store_repository.search(
+            self._db,
+            domain=domain,
+            limit=limit
+        )
+        return [Example.model_validate(obj) for obj in db_objs]
+
+    def create_example(
+        self,
+        payload: ExampleCreate,
+        created_by: Optional[str] = None
+    ) -> Example:
+        """Create a new example"""
+        db_obj = example_store_repository.create(self._db, obj_in=payload)
+        if created_by:
+            db_obj.created_by = created_by
+        self._db.flush()
+        self._db.refresh(db_obj)
+        logger.info(f"Created example in domain '{payload.domain}' with id {db_obj.id}")
+        return Example.model_validate(db_obj)
+
+    def update_example(
+        self,
+        example_id: UUID,
+        payload: ExampleUpdate,
+        updated_by: Optional[str] = None
+    ) -> Optional[Example]:
+        """Update an example"""
+        db_obj = example_store_repository.get(self._db, example_id)
+        if not db_obj:
+            return None
+        update_data = payload.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_obj, field, value)
+        db_obj.updated_by = updated_by
+        self._db.add(db_obj)
+        self._db.flush()
+        self._db.refresh(db_obj)
+        return Example.model_validate(db_obj)
+
+    def delete_example(self, example_id: UUID) -> bool:
+        """Delete an example"""
+        result = example_store_repository.remove(self._db, id=example_id)
+        return result is not None
 
     # =========================================================================
     # EXPORT
@@ -1137,3 +1348,153 @@ class TrainingDataManager:
             self._db, collection_id
         )
         return [ModelLineage.model_validate(obj) for obj in db_objs]
+
+    # =========================================================================
+    # TRAINING JOBS
+    # =========================================================================
+
+    def list_training_jobs(
+        self,
+        collection_id: Optional[UUID] = None,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[TrainingJob]:
+        """List training jobs"""
+        if collection_id:
+            db_objs = training_jobs_repository.list_by_collection(self._db, collection_id)
+        else:
+            db_objs = training_jobs_repository.list_all(self._db, skip=skip, limit=limit)
+        return [TrainingJob.model_validate(obj) for obj in db_objs]
+
+    def create_training_job(
+        self,
+        payload: TrainingJobCreate,
+        created_by: Optional[str] = None
+    ) -> TrainingJob:
+        """Create a training job record"""
+        # Validate collection exists
+        collection = training_collections_repository.get_with_stats(self._db, payload.collection_id)
+        if not collection:
+            raise ValueError(f"Collection {payload.collection_id} not found")
+
+        # Calculate pair counts based on split
+        total = collection.approved_pairs or 0
+        train_pairs = int(total * payload.train_val_split)
+        val_pairs = total - train_pairs
+
+        db_obj = TrainingJobDb(
+            collection_id=payload.collection_id,
+            model_name=payload.model_name,
+            base_model=payload.base_model or "databricks-meta-llama-3-1-70b-instruct",
+            status=TrainingJobStatus.PENDING,
+            training_config=payload.training_config or {},
+            train_val_split=payload.train_val_split,
+            total_pairs=total,
+            train_pairs=train_pairs,
+            val_pairs=val_pairs,
+            created_by=created_by
+        )
+        self._db.add(db_obj)
+        self._db.flush()
+        self._db.refresh(db_obj)
+
+        logger.info(f"Created training job '{payload.model_name}' with {total} pairs")
+        return TrainingJob.model_validate(db_obj)
+
+    def get_training_job(self, job_id: UUID) -> Optional[TrainingJob]:
+        """Get training job by ID"""
+        db_obj = training_jobs_repository.get(self._db, job_id)
+        return TrainingJob.model_validate(db_obj) if db_obj else None
+
+    # =========================================================================
+    # DSPY
+    # =========================================================================
+
+    def export_template_as_dspy(
+        self,
+        template_id: UUID,
+        output_format: str = "module"
+    ) -> Optional[DSPyExportResult]:
+        """Export a prompt template as DSPy program code"""
+        template = prompt_templates_repository.get(self._db, template_id)
+        if not template:
+            return None
+
+        api_template = self._template_to_api(template)
+
+        # Generate DSPy signature code
+        input_fields = list((api_template.variable_mappings or {}).keys()) or ["question"]
+        output_fields = ["answer"]
+
+        signature_code = f'class {api_template.name.replace(" ", "").replace("-", "")}Signature(dspy.Signature):\n'
+        signature_code += f'    """{api_template.description or api_template.name}"""\n'
+        for field in input_fields:
+            signature_code += f'    {field} = dspy.InputField()\n'
+        for field in output_fields:
+            signature_code += f'    {field} = dspy.OutputField()\n'
+
+        # Generate module code
+        program_code = f'import dspy\n\n{signature_code}\n\n'
+        program_code += f'class {api_template.name.replace(" ", "").replace("-", "")}(dspy.Module):\n'
+        program_code += f'    def __init__(self):\n'
+        program_code += f'        super().__init__()\n'
+        program_code += f'        self.predict = dspy.Predict({api_template.name.replace(" ", "").replace("-", "")}Signature)\n\n'
+        program_code += f'    def forward(self, {", ".join(input_fields)}):\n'
+        program_code += f'        return self.predict({", ".join(f"{f}={f}" for f in input_fields)})\n'
+
+        return DSPyExportResult(
+            template_id=template_id,
+            program_code=program_code,
+            signature_code=signature_code,
+            format=output_format
+        )
+
+    def create_dspy_run(
+        self,
+        payload: DSPyRunCreate,
+        created_by: Optional[str] = None
+    ) -> DSPyRun:
+        """Create a DSPy optimization run"""
+        db_obj = DSPyOptimizationRunDb(
+            template_id=payload.template_id,
+            program_name=payload.program_name,
+            signature_name=payload.signature_name,
+            status=DSPyRunStatus.PENDING,
+            optimizer_type=payload.optimizer_type or "BootstrapFewShot",
+            config=payload.config or {},
+            trials_total=payload.trials_total,
+            created_by=created_by
+        )
+        self._db.add(db_obj)
+        self._db.flush()
+        self._db.refresh(db_obj)
+
+        logger.info(f"Created DSPy run '{payload.program_name}' with id {db_obj.id}")
+        return DSPyRun.model_validate(db_obj)
+
+    def get_dspy_run(self, run_id: UUID) -> Optional[DSPyRun]:
+        """Get DSPy run by ID"""
+        db_obj = dspy_runs_repository.get(self._db, run_id)
+        return DSPyRun.model_validate(db_obj) if db_obj else None
+
+    def cancel_dspy_run(self, run_id: UUID) -> bool:
+        """Cancel a DSPy optimization run"""
+        db_obj = dspy_runs_repository.get(self._db, run_id)
+        if not db_obj:
+            return False
+        if db_obj.status in (DSPyRunStatus.COMPLETED, DSPyRunStatus.FAILED, DSPyRunStatus.CANCELLED):
+            raise ValueError(f"Cannot cancel run in {db_obj.status.value} state")
+        db_obj.status = DSPyRunStatus.CANCELLED
+        db_obj.completed_at = datetime.now(timezone.utc)
+        self._db.add(db_obj)
+        self._db.flush()
+        return True
+
+    def list_dspy_runs(
+        self,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[DSPyRun]:
+        """List DSPy optimization runs"""
+        db_objs = dspy_runs_repository.list_all(self._db, skip=skip, limit=limit)
+        return [DSPyRun.model_validate(obj) for obj in db_objs]

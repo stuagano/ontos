@@ -29,9 +29,14 @@ from src.models.training_data import (
     CanonicalLabelCreate,
     CanonicalLabelUpdate,
     ChatMessage,
+    DSPyExportRequest,
+    DSPyExportResult,
+    DSPyRun,
+    DSPyRunCreate,
     Example,
     ExampleCreate,
     ExampleSearchQuery,
+    ExampleUpdate,
     ExportFormat,
     ExportRequest,
     ExportResult,
@@ -54,6 +59,8 @@ from src.models.training_data import (
     TrainingCollectionCreate,
     TrainingCollectionUpdate,
     TrainingDataGap,
+    TrainingJob,
+    TrainingJobCreate,
 )
 
 logger = logging.getLogger(__name__)
@@ -215,6 +222,89 @@ async def validate_sheet_source(
         return {"valid": False, "error": str(e)}
 
 
+@router.put("/sheets/{sheet_id}", response_model=Sheet)
+async def update_sheet(
+    sheet_id: UUID,
+    payload: SheetUpdate,
+    request: Request,
+    current_user: AuditCurrentUserDep,
+    audit_manager: AuditManagerDep,
+    db: DBSessionDep,
+    manager: TrainingDataManager = Depends(get_manager),
+    _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_WRITE))
+):
+    """Update a sheet"""
+    success = False
+    details = {"sheet_id": str(sheet_id)}
+
+    try:
+        result = manager.update_sheet(
+            sheet_id,
+            payload,
+            updated_by=current_user.username if current_user else None
+        )
+        if not result:
+            raise HTTPException(status_code=404, detail="Sheet not found")
+        db.commit()
+        success = True
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update sheet: {e}", exc_info=True)
+        details["exception"] = {"type": type(e).__name__, "message": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        audit_manager.log_action(
+            db=db,
+            username=current_user.username if current_user else "anonymous",
+            ip_address=request.client.host if request.client else None,
+            feature="training-data-sheets",
+            action="UPDATE",
+            success=success,
+            details=details
+        )
+
+
+@router.delete("/sheets/{sheet_id}")
+async def delete_sheet(
+    sheet_id: UUID,
+    request: Request,
+    current_user: AuditCurrentUserDep,
+    audit_manager: AuditManagerDep,
+    db: DBSessionDep,
+    manager: TrainingDataManager = Depends(get_manager),
+    _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_WRITE))
+):
+    """Delete a sheet"""
+    success = False
+    details = {"sheet_id": str(sheet_id)}
+
+    try:
+        deleted = manager.delete_sheet(sheet_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Sheet not found")
+        db.commit()
+        success = True
+        return {"deleted": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete sheet: {e}", exc_info=True)
+        details["exception"] = {"type": type(e).__name__, "message": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        audit_manager.log_action(
+            db=db,
+            username=current_user.username if current_user else "anonymous",
+            ip_address=request.client.host if request.client else None,
+            feature="training-data-sheets",
+            action="DELETE",
+            success=success,
+            details=details
+        )
+
+
 @router.get("/sheets/{sheet_id}/preview")
 async def preview_sheet_data(
     sheet_id: UUID,
@@ -330,6 +420,89 @@ async def get_template(
     return result
 
 
+@router.put("/templates/{template_id}", response_model=PromptTemplate)
+async def update_template(
+    template_id: UUID,
+    payload: PromptTemplateUpdate,
+    request: Request,
+    current_user: AuditCurrentUserDep,
+    audit_manager: AuditManagerDep,
+    db: DBSessionDep,
+    manager: TrainingDataManager = Depends(get_manager),
+    _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_WRITE))
+):
+    """Update a prompt template"""
+    success = False
+    details = {"template_id": str(template_id)}
+
+    try:
+        result = manager.update_template(
+            template_id,
+            payload,
+            updated_by=current_user.username if current_user else None
+        )
+        if not result:
+            raise HTTPException(status_code=404, detail="Template not found")
+        db.commit()
+        success = True
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update template: {e}", exc_info=True)
+        details["exception"] = {"type": type(e).__name__, "message": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        audit_manager.log_action(
+            db=db,
+            username=current_user.username if current_user else "anonymous",
+            ip_address=request.client.host if request.client else None,
+            feature="training-data-templates",
+            action="UPDATE",
+            success=success,
+            details=details
+        )
+
+
+@router.delete("/templates/{template_id}")
+async def delete_template(
+    template_id: UUID,
+    request: Request,
+    current_user: AuditCurrentUserDep,
+    audit_manager: AuditManagerDep,
+    db: DBSessionDep,
+    manager: TrainingDataManager = Depends(get_manager),
+    _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_WRITE))
+):
+    """Delete a prompt template"""
+    success = False
+    details = {"template_id": str(template_id)}
+
+    try:
+        deleted = manager.delete_template(template_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Template not found")
+        db.commit()
+        success = True
+        return {"deleted": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete template: {e}", exc_info=True)
+        details["exception"] = {"type": type(e).__name__, "message": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        audit_manager.log_action(
+            db=db,
+            username=current_user.username if current_user else "anonymous",
+            ip_address=request.client.host if request.client else None,
+            feature="training-data-templates",
+            action="DELETE",
+            success=success,
+            details=details
+        )
+
+
 # =============================================================================
 # CANONICAL LABELS
 # =============================================================================
@@ -371,6 +544,26 @@ async def create_canonical_label(
             success=success,
             details=details
         )
+
+
+@router.get("/canonical-labels", response_model=List[CanonicalLabel])
+async def list_canonical_labels(
+    sheet_id: Optional[UUID] = None,
+    label_type: Optional[LabelType] = None,
+    only_verified: bool = False,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    manager: TrainingDataManager = Depends(get_manager),
+    _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_ONLY))
+):
+    """List canonical labels with optional filters"""
+    return manager.list_canonical_labels(
+        sheet_id=sheet_id,
+        label_type=label_type,
+        only_verified=only_verified,
+        skip=skip,
+        limit=limit
+    )
 
 
 @router.get("/canonical-labels/{label_id}", response_model=CanonicalLabel)
@@ -423,6 +616,89 @@ async def verify_canonical_label(
             ip_address=request.client.host if request.client else None,
             feature="training-data-labels",
             action="VERIFY",
+            success=success,
+            details=details
+        )
+
+
+@router.put("/canonical-labels/{label_id}", response_model=CanonicalLabel)
+async def update_canonical_label(
+    label_id: UUID,
+    payload: CanonicalLabelUpdate,
+    request: Request,
+    current_user: AuditCurrentUserDep,
+    audit_manager: AuditManagerDep,
+    db: DBSessionDep,
+    manager: TrainingDataManager = Depends(get_manager),
+    _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_WRITE))
+):
+    """Update a canonical label"""
+    success = False
+    details = {"label_id": str(label_id)}
+
+    try:
+        result = manager.update_canonical_label(
+            label_id,
+            payload,
+            updated_by=current_user.username if current_user else None
+        )
+        if not result:
+            raise HTTPException(status_code=404, detail="Canonical label not found")
+        db.commit()
+        success = True
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update canonical label: {e}", exc_info=True)
+        details["exception"] = {"type": type(e).__name__, "message": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        audit_manager.log_action(
+            db=db,
+            username=current_user.username if current_user else "anonymous",
+            ip_address=request.client.host if request.client else None,
+            feature="training-data-labels",
+            action="UPDATE",
+            success=success,
+            details=details
+        )
+
+
+@router.delete("/canonical-labels/{label_id}")
+async def delete_canonical_label(
+    label_id: UUID,
+    request: Request,
+    current_user: AuditCurrentUserDep,
+    audit_manager: AuditManagerDep,
+    db: DBSessionDep,
+    manager: TrainingDataManager = Depends(get_manager),
+    _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_WRITE))
+):
+    """Delete a canonical label"""
+    success = False
+    details = {"label_id": str(label_id)}
+
+    try:
+        deleted = manager.delete_canonical_label(label_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Canonical label not found")
+        db.commit()
+        success = True
+        return {"deleted": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete canonical label: {e}", exc_info=True)
+        details["exception"] = {"type": type(e).__name__, "message": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        audit_manager.log_action(
+            db=db,
+            username=current_user.username if current_user else "anonymous",
+            ip_address=request.client.host if request.client else None,
+            feature="training-data-labels",
+            action="DELETE",
             success=success,
             details=details
         )
@@ -601,6 +877,50 @@ async def get_qa_pair(
     if not result:
         raise HTTPException(status_code=404, detail="QA pair not found")
     return result
+
+
+@router.put("/pairs/{pair_id}", response_model=QAPair)
+async def update_qa_pair(
+    pair_id: UUID,
+    payload: QAPairUpdate,
+    request: Request,
+    current_user: AuditCurrentUserDep,
+    audit_manager: AuditManagerDep,
+    db: DBSessionDep,
+    manager: TrainingDataManager = Depends(get_manager),
+    _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_WRITE))
+):
+    """Update a QA pair"""
+    success = False
+    details = {"pair_id": str(pair_id)}
+
+    try:
+        result = manager.update_qa_pair(
+            pair_id,
+            payload,
+            updated_by=current_user.username if current_user else None
+        )
+        if not result:
+            raise HTTPException(status_code=404, detail="QA pair not found")
+        db.commit()
+        success = True
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update QA pair: {e}", exc_info=True)
+        details["exception"] = {"type": type(e).__name__, "message": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        audit_manager.log_action(
+            db=db,
+            username=current_user.username if current_user else "anonymous",
+            ip_address=request.client.host if request.client else None,
+            feature="training-data-pairs",
+            action="UPDATE",
+            success=success,
+            details=details
+        )
 
 
 @router.post("/pairs/{pair_id}/review", response_model=QAPair)
@@ -847,6 +1167,165 @@ async def analyze_training_gaps(
 
 
 # =============================================================================
+# EXAMPLES
+# =============================================================================
+
+@router.get("/examples", response_model=List[Example])
+async def list_examples(
+    domain: Optional[str] = None,
+    task_type: Optional[str] = None,
+    difficulty: Optional[str] = None,
+    only_verified: bool = False,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    manager: TrainingDataManager = Depends(get_manager),
+    _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_ONLY))
+):
+    """List examples with optional filters"""
+    return manager.list_examples(
+        domain=domain,
+        task_type=task_type,
+        difficulty=difficulty,
+        only_verified=only_verified,
+        skip=skip,
+        limit=limit
+    )
+
+
+@router.get("/examples/top", response_model=List[Example])
+async def get_top_examples(
+    limit: int = Query(10, ge=1, le=100),
+    domain: Optional[str] = None,
+    manager: TrainingDataManager = Depends(get_manager),
+    _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_ONLY))
+):
+    """Get top-performing examples by effectiveness score"""
+    return manager.get_top_examples(limit=limit, domain=domain)
+
+
+@router.post("/examples", response_model=Example, status_code=201)
+async def create_example(
+    payload: ExampleCreate,
+    request: Request,
+    current_user: AuditCurrentUserDep,
+    audit_manager: AuditManagerDep,
+    db: DBSessionDep,
+    manager: TrainingDataManager = Depends(get_manager),
+    _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_WRITE))
+):
+    """Create a new example"""
+    success = False
+    details = {"params": {"domain": payload.domain, "task_type": payload.task_type}}
+
+    try:
+        result = manager.create_example(
+            payload,
+            created_by=current_user.username if current_user else None
+        )
+        db.commit()
+        success = True
+        details["created_resource_id"] = str(result.id)
+        return result
+    except Exception as e:
+        logger.error(f"Failed to create example: {e}", exc_info=True)
+        details["exception"] = {"type": type(e).__name__, "message": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        audit_manager.log_action(
+            db=db,
+            username=current_user.username if current_user else "anonymous",
+            ip_address=request.client.host if request.client else None,
+            feature="training-data-examples",
+            action="CREATE",
+            success=success,
+            details=details
+        )
+
+
+@router.put("/examples/{example_id}", response_model=Example)
+async def update_example(
+    example_id: UUID,
+    payload: ExampleUpdate,
+    request: Request,
+    current_user: AuditCurrentUserDep,
+    audit_manager: AuditManagerDep,
+    db: DBSessionDep,
+    manager: TrainingDataManager = Depends(get_manager),
+    _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_WRITE))
+):
+    """Update an example"""
+    success = False
+    details = {"example_id": str(example_id)}
+
+    try:
+        result = manager.update_example(
+            example_id,
+            payload,
+            updated_by=current_user.username if current_user else None
+        )
+        if not result:
+            raise HTTPException(status_code=404, detail="Example not found")
+        db.commit()
+        success = True
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update example: {e}", exc_info=True)
+        details["exception"] = {"type": type(e).__name__, "message": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        audit_manager.log_action(
+            db=db,
+            username=current_user.username if current_user else "anonymous",
+            ip_address=request.client.host if request.client else None,
+            feature="training-data-examples",
+            action="UPDATE",
+            success=success,
+            details=details
+        )
+
+
+@router.delete("/examples/{example_id}")
+async def delete_example(
+    example_id: UUID,
+    request: Request,
+    current_user: AuditCurrentUserDep,
+    audit_manager: AuditManagerDep,
+    db: DBSessionDep,
+    manager: TrainingDataManager = Depends(get_manager),
+    _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_WRITE))
+):
+    """Delete an example"""
+    success = False
+    details = {"example_id": str(example_id)}
+
+    try:
+        deleted = manager.delete_example(example_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Example not found")
+        db.commit()
+        success = True
+        return {"deleted": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete example: {e}", exc_info=True)
+        details["exception"] = {"type": type(e).__name__, "message": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        audit_manager.log_action(
+            db=db,
+            username=current_user.username if current_user else "anonymous",
+            ip_address=request.client.host if request.client else None,
+            feature="training-data-examples",
+            action="DELETE",
+            success=success,
+            details=details
+        )
+
+
+# =============================================================================
 # EXPORT
 # =============================================================================
 
@@ -969,6 +1448,195 @@ async def list_models_for_collection(
 ):
     """List all models trained on a collection"""
     return manager.list_models_for_collection(collection_id)
+
+
+# =============================================================================
+# TRAINING JOBS
+# =============================================================================
+
+@router.get("/training-jobs", response_model=List[TrainingJob])
+async def list_training_jobs(
+    collection_id: Optional[UUID] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    manager: TrainingDataManager = Depends(get_manager),
+    _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_ONLY))
+):
+    """List training jobs"""
+    return manager.list_training_jobs(collection_id=collection_id, skip=skip, limit=limit)
+
+
+@router.post("/training-jobs", response_model=TrainingJob, status_code=201)
+async def create_training_job(
+    payload: TrainingJobCreate,
+    request: Request,
+    current_user: AuditCurrentUserDep,
+    audit_manager: AuditManagerDep,
+    db: DBSessionDep,
+    manager: TrainingDataManager = Depends(get_manager),
+    _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_WRITE))
+):
+    """Create and submit a training job"""
+    success = False
+    details = {"model_name": payload.model_name, "collection_id": str(payload.collection_id)}
+
+    try:
+        result = manager.create_training_job(
+            payload,
+            created_by=current_user.username if current_user else None
+        )
+        db.commit()
+        success = True
+        details["created_resource_id"] = str(result.id)
+        return result
+    except Exception as e:
+        logger.error(f"Failed to create training job: {e}", exc_info=True)
+        details["exception"] = {"type": type(e).__name__, "message": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        audit_manager.log_action(
+            db=db,
+            username=current_user.username if current_user else "anonymous",
+            ip_address=request.client.host if request.client else None,
+            feature="training-data-jobs",
+            action="CREATE",
+            success=success,
+            details=details
+        )
+
+
+@router.get("/training-jobs/{job_id}", response_model=TrainingJob)
+async def get_training_job(
+    job_id: UUID,
+    manager: TrainingDataManager = Depends(get_manager),
+    _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_ONLY))
+):
+    """Get training job by ID"""
+    result = manager.get_training_job(job_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Training job not found")
+    return result
+
+
+# =============================================================================
+# DSPY
+# =============================================================================
+
+@router.post("/dspy/export/{template_id}", response_model=DSPyExportResult)
+async def export_template_as_dspy(
+    template_id: UUID,
+    payload: Optional[DSPyExportRequest] = None,
+    manager: TrainingDataManager = Depends(get_manager),
+    _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_ONLY))
+):
+    """Export a prompt template as DSPy program code"""
+    output_format = payload.output_format if payload else "module"
+    result = manager.export_template_as_dspy(template_id, output_format=output_format)
+    if not result:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return result
+
+
+@router.post("/dspy/runs", response_model=DSPyRun, status_code=201)
+async def create_dspy_run(
+    payload: DSPyRunCreate,
+    request: Request,
+    current_user: AuditCurrentUserDep,
+    audit_manager: AuditManagerDep,
+    db: DBSessionDep,
+    manager: TrainingDataManager = Depends(get_manager),
+    _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_WRITE))
+):
+    """Create a DSPy optimization run"""
+    success = False
+    details = {"program_name": payload.program_name, "template_id": str(payload.template_id)}
+
+    try:
+        result = manager.create_dspy_run(
+            payload,
+            created_by=current_user.username if current_user else None
+        )
+        db.commit()
+        success = True
+        details["created_resource_id"] = str(result.id)
+        return result
+    except Exception as e:
+        logger.error(f"Failed to create DSPy run: {e}", exc_info=True)
+        details["exception"] = {"type": type(e).__name__, "message": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        audit_manager.log_action(
+            db=db,
+            username=current_user.username if current_user else "anonymous",
+            ip_address=request.client.host if request.client else None,
+            feature="training-data-dspy",
+            action="CREATE",
+            success=success,
+            details=details
+        )
+
+
+@router.get("/dspy/runs/{run_id}", response_model=DSPyRun)
+async def get_dspy_run(
+    run_id: UUID,
+    manager: TrainingDataManager = Depends(get_manager),
+    _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_ONLY))
+):
+    """Get DSPy run by ID"""
+    result = manager.get_dspy_run(run_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="DSPy run not found")
+    return result
+
+
+@router.post("/dspy/runs/{run_id}/cancel")
+async def cancel_dspy_run(
+    run_id: UUID,
+    request: Request,
+    current_user: AuditCurrentUserDep,
+    audit_manager: AuditManagerDep,
+    db: DBSessionDep,
+    manager: TrainingDataManager = Depends(get_manager),
+    _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_WRITE))
+):
+    """Cancel a running DSPy optimization"""
+    success = False
+    details = {"run_id": str(run_id)}
+
+    try:
+        result = manager.cancel_dspy_run(run_id)
+        if not result:
+            raise HTTPException(status_code=404, detail="DSPy run not found")
+        db.commit()
+        success = True
+        return {"cancelled": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to cancel DSPy run: {e}", exc_info=True)
+        details["exception"] = {"type": type(e).__name__, "message": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        audit_manager.log_action(
+            db=db,
+            username=current_user.username if current_user else "anonymous",
+            ip_address=request.client.host if request.client else None,
+            feature="training-data-dspy",
+            action="CANCEL",
+            success=success,
+            details=details
+        )
+
+
+@router.get("/dspy/runs", response_model=List[DSPyRun])
+async def list_dspy_runs(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    manager: TrainingDataManager = Depends(get_manager),
+    _: bool = Depends(PermissionChecker('training-data', FeatureAccessLevel.READ_ONLY))
+):
+    """List all DSPy optimization runs"""
+    return manager.list_dspy_runs(skip=skip, limit=limit)
 
 
 # =============================================================================

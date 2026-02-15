@@ -16,6 +16,8 @@ from sqlalchemy.orm import Session, selectinload
 from src.common.repository import CRUDBase
 from src.db_models.training_data import (
     CanonicalLabelDb,
+    DSPyOptimizationRunDb,
+    DSPyRunStatus,
     ExampleStoreDb,
     ModelTrainingLineageDb,
     PromptTemplateDb,
@@ -24,17 +26,21 @@ from src.db_models.training_data import (
     SheetDb,
     TemplateStatus,
     TrainingCollectionDb,
+    TrainingJobDb,
+    TrainingJobStatus,
     TrainingSheetStatus,
     LabelType,
 )
 from src.models.training_data import (
     CanonicalLabelCreate,
+    DSPyRunCreate,
     ExampleCreate,
     ModelLineageCreate,
     PromptTemplateCreate,
     QAPairCreate,
     SheetCreate,
     TrainingCollectionCreate,
+    TrainingJobCreate,
 )
 
 logger = logging.getLogger(__name__)
@@ -789,3 +795,78 @@ class ModelTrainingLineageRepository(CRUDBase[ModelTrainingLineageDb, ModelLinea
 
 
 model_training_lineage_repository = ModelTrainingLineageRepository()
+
+
+# =============================================================================
+# TRAINING JOBS REPOSITORY
+# =============================================================================
+
+class TrainingJobsRepository(CRUDBase[TrainingJobDb, TrainingJobCreate, dict]):
+    """Repository for training job operations"""
+
+    def __init__(self):
+        super().__init__(TrainingJobDb)
+
+    def list_all(
+        self,
+        db: Session,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[TrainingJobDb]:
+        """List all training jobs"""
+        try:
+            return db.query(self.model).order_by(
+                self.model.created_at.desc()
+            ).offset(skip).limit(limit).all()
+        except SQLAlchemyError as e:
+            logger.error(f"Error listing training jobs: {e}")
+            db.rollback()
+            raise
+
+    def list_by_collection(
+        self,
+        db: Session,
+        collection_id: UUID
+    ) -> List[TrainingJobDb]:
+        """List training jobs for a collection"""
+        try:
+            return db.query(self.model).filter(
+                self.model.collection_id == collection_id
+            ).order_by(self.model.created_at.desc()).all()
+        except SQLAlchemyError as e:
+            logger.error(f"Error listing training jobs by collection: {e}")
+            db.rollback()
+            raise
+
+
+training_jobs_repository = TrainingJobsRepository()
+
+
+# =============================================================================
+# DSPY OPTIMIZATION RUNS REPOSITORY
+# =============================================================================
+
+class DSPyRunsRepository(CRUDBase[DSPyOptimizationRunDb, DSPyRunCreate, dict]):
+    """Repository for DSPy optimization run operations"""
+
+    def __init__(self):
+        super().__init__(DSPyOptimizationRunDb)
+
+    def list_all(
+        self,
+        db: Session,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[DSPyOptimizationRunDb]:
+        """List all DSPy runs"""
+        try:
+            return db.query(self.model).order_by(
+                self.model.created_at.desc()
+            ).offset(skip).limit(limit).all()
+        except SQLAlchemyError as e:
+            logger.error(f"Error listing DSPy runs: {e}")
+            db.rollback()
+            raise
+
+
+dspy_runs_repository = DSPyRunsRepository()

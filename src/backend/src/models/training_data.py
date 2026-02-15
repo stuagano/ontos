@@ -346,6 +346,8 @@ class TrainingCollectionBase(BaseModel):
 
 class TrainingCollectionCreate(TrainingCollectionBase):
     """Create collection request"""
+    model_config = {"protected_namespaces": ()}
+
     sheet_id: Optional[UUID] = Field(None, description="Source sheet ID")
     template_id: Optional[UUID] = Field(None, description="Prompt template ID")
     model_used: Optional[str] = Field(None, description="Model used for generation")
@@ -395,7 +397,7 @@ class TrainingCollection(TrainingCollectionBase):
     created_at: datetime
     updated_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "protected_namespaces": ()}
 
     @property
     def stats(self) -> TrainingCollectionStats:
@@ -541,6 +543,120 @@ class ExportResult(BaseModel):
 
 
 # =============================================================================
+# TRAINING JOBS
+# =============================================================================
+
+class TrainingJobStatus(str, Enum):
+    PENDING = "pending"
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class TrainingJobCreate(BaseModel):
+    """Create training job request"""
+    model_config = {"protected_namespaces": ()}
+
+    collection_id: UUID = Field(..., description="Training collection to use")
+    model_name: str = Field(..., description="Name for the fine-tuned model")
+    base_model: Optional[str] = Field(None, description="Base model to fine-tune")
+    training_config: Optional[Dict[str, Any]] = Field(None, description="Training hyperparameters")
+    train_val_split: float = Field(0.8, ge=0.1, le=0.99, description="Train/val split ratio")
+
+
+class TrainingJob(BaseModel):
+    """Training job response"""
+    id: UUID
+    collection_id: Optional[UUID] = None
+    model_name: str
+    base_model: Optional[str] = None
+    status: TrainingJobStatus = TrainingJobStatus.PENDING
+    training_config: Optional[Dict[str, Any]] = None
+    train_val_split: Optional[float] = None
+    total_pairs: Optional[int] = None
+    train_pairs: Optional[int] = None
+    val_pairs: Optional[int] = None
+    progress_percent: Optional[float] = None
+    current_epoch: Optional[int] = None
+    total_epochs: Optional[int] = None
+    best_metric: Optional[float] = None
+    metric_name: Optional[str] = None
+    fmapi_job_id: Optional[str] = None
+    mlflow_run_id: Optional[str] = None
+    error_message: Optional[str] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True, "protected_namespaces": ()}
+
+
+# =============================================================================
+# DSPY
+# =============================================================================
+
+class DSPyRunStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class DSPyExportRequest(BaseModel):
+    """Request to export template as DSPy program"""
+    output_format: str = Field("module", description="Export format: module or signature")
+
+
+class DSPyExportResult(BaseModel):
+    """Result of DSPy export"""
+    template_id: UUID
+    program_code: str
+    signature_code: Optional[str] = None
+    format: str
+
+
+class DSPyRunCreate(BaseModel):
+    """Create DSPy optimization run"""
+    template_id: UUID = Field(..., description="Template to optimize")
+    program_name: str = Field(..., description="DSPy program name")
+    signature_name: Optional[str] = Field(None, description="DSPy signature name")
+    optimizer_type: Optional[str] = Field("BootstrapFewShot", description="Optimizer type")
+    config: Optional[Dict[str, Any]] = Field(None, description="Optimizer config")
+    trials_total: Optional[int] = Field(None, description="Total optimization trials")
+
+
+class DSPyRun(BaseModel):
+    """DSPy optimization run response"""
+    id: UUID
+    template_id: Optional[UUID] = None
+    program_name: str
+    signature_name: Optional[str] = None
+    status: DSPyRunStatus = DSPyRunStatus.PENDING
+    optimizer_type: Optional[str] = None
+    config: Optional[Dict[str, Any]] = None
+    trials_completed: Optional[int] = None
+    trials_total: Optional[int] = None
+    best_score: Optional[float] = None
+    results: Optional[Dict[str, Any]] = None
+    top_example_ids: List[str] = Field(default_factory=list)
+    error_message: Optional[str] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# =============================================================================
 # EXAMPLE STORE
 # =============================================================================
 
@@ -617,6 +733,8 @@ class ExampleSearchResult(BaseModel):
 
 class ModelLineageCreate(BaseModel):
     """Create lineage record"""
+    model_config = {"protected_namespaces": ()}
+
     model_name: str = Field(..., description="Model name")
     model_version: str = Field(..., description="Model version")
     model_registry_path: Optional[str] = Field(None, description="Unity Catalog path")
@@ -629,6 +747,8 @@ class ModelLineageCreate(BaseModel):
 
 class ModelLineageUpdate(BaseModel):
     """Update lineage record"""
+    model_config = {"protected_namespaces": ()}
+
     model_registry_path: Optional[str] = None
     training_run_id: Optional[str] = None
     final_loss: Optional[float] = None
@@ -657,7 +777,7 @@ class ModelLineage(BaseModel):
     created_by: Optional[str] = None
     created_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "protected_namespaces": ()}
 
 
 # =============================================================================
