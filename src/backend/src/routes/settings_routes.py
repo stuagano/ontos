@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 
 from databricks.sdk import WorkspaceClient
-from fastapi import APIRouter, Depends, HTTPException, status, Body, Request, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, Body, Request, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 
 from ..common.workspace_client import get_workspace_client
@@ -381,11 +381,12 @@ async def load_demo_data(
     db: DBSessionDep,
     audit_manager: AuditManagerDep,
     current_user: AuditCurrentUserDep,
+    include_training: bool = Query(False, description="Also load Mirion training demo data"),
     manager: SettingsManager = Depends(get_settings_manager)
 ):
     """
     Load demo data from SQL file into the database.
-    
+
     This endpoint is Admin-only and loads all demo/example data including:
     - Data Domains
     - Teams and Team Members
@@ -398,7 +399,10 @@ async def load_demo_data(
     - Cost Items
     - Semantic Links
     - Metadata (notes, links, documents)
-    
+
+    When include_training=true, also loads Mirion training demo data from
+    mirion_training_demo_data.sql (additional training-specific datasets).
+
     The SQL uses ON CONFLICT DO NOTHING to avoid duplicate key errors on re-runs.
     """
     success = False
@@ -467,18 +471,69 @@ async def load_demo_data(
                 except Exception as stmt_error:
                     logger.warning(f"Statement execution warning: {stmt_error}")
                     # Continue with other statements - ON CONFLICT should handle duplicates
-        
+
+        # Optionally load training demo data
+        training_executed_count = 0
+        if include_training:
+            training_sql_file = data_dir / "mirion_training_demo_data.sql"
+            if not training_sql_file.exists():
+                details["training_warning"] = "mirion_training_demo_data.sql not found"
+                logger.warning(f"Training demo data file not found at {training_sql_file}")
+            else:
+                training_sql_content = training_sql_file.read_text(encoding="utf-8")
+
+                # Parse training SQL using the same logic
+                training_statements = []
+                current_statement = []
+                in_dollar_quote = False
+
+                for line in training_sql_content.split('\n'):
+                    stripped = line.strip()
+
+                    if not stripped or stripped.startswith('--'):
+                        if current_statement:
+                            current_statement.append(line)
+                        continue
+
+                    if "E'" in line or "$$" in line:
+                        in_dollar_quote = not in_dollar_quote if "$$" in line else in_dollar_quote
+
+                    current_statement.append(line)
+
+                    if stripped.endswith(';') and not in_dollar_quote:
+                        full_statement = '\n'.join(current_statement).strip()
+                        if full_statement and not full_statement.startswith('--'):
+                            if full_statement.upper() not in ('BEGIN;', 'COMMIT;'):
+                                training_statements.append(full_statement)
+                        current_statement = []
+
+                for stmt in training_statements:
+                    if stmt.strip():
+                        try:
+                            connection.execute(text(stmt))
+                            training_executed_count += 1
+                        except Exception as stmt_error:
+                            logger.warning(f"Training statement execution warning: {stmt_error}")
+
+                logger.info(f"Training demo data loaded. Executed {training_executed_count} statements.")
+
         db.commit()
-        
+
         success = True
         details["statements_executed"] = executed_count
-        
-        logger.info(f"Demo data loaded successfully. Executed {executed_count} statements.")
-        
+        details["training_statements_executed"] = training_executed_count
+
+        message = f"Demo data loaded successfully. Executed {executed_count} SQL statements."
+        if include_training:
+            message += f" Training data: {training_executed_count} statements."
+
+        logger.info(f"Demo data loaded successfully. Executed {executed_count} statements, training: {training_executed_count}.")
+
         return {
             "status": "success",
-            "message": f"Demo data loaded successfully. Executed {executed_count} SQL statements.",
-            "statements_executed": executed_count
+            "message": message,
+            "statements_executed": executed_count,
+            "training_statements_executed": training_executed_count
         }
         
     except HTTPException:

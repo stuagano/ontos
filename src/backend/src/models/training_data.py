@@ -531,6 +531,7 @@ class ExportRequest(BaseModel):
     only_approved: bool = Field(True, description="Only export approved pairs")
     include_metadata: bool = Field(False, description="Include generation metadata")
     output_path: Optional[str] = Field(None, description="Output path (defaults to generated)")
+    enforce_quality_gate: bool = Field(False, description="Require quality gate pass before export")
 
 
 class ExportResult(BaseModel):

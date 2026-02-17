@@ -63,6 +63,7 @@ from src.routes import (
     ml_deploy_routes,
     ml_monitor_routes,
     ml_improve_routes,
+    training_data_quality_routes,
 )
 
 from src.common.database import init_db, get_session_factory, SQLAlchemySession
@@ -314,6 +315,7 @@ training_data_routes.register_routes(app)
 ml_deploy_routes.register_routes(app)
 ml_monitor_routes.register_routes(app)
 ml_improve_routes.register_routes(app)
+training_data_quality_routes.register_routes(app)
 
 # Security - Access control and security features
 security_features_routes.register_routes(app)

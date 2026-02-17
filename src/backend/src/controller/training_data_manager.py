@@ -1156,6 +1156,15 @@ class TrainingDataManager:
         if not collection:
             raise ValueError(f"Collection {request.collection_id} not found")
 
+        # Quality gate (opt-in via enforce_quality_gate flag)
+        if request.enforce_quality_gate:
+            from src.controller.training_data_quality_manager import TrainingDataQualityManager
+            quality_manager = TrainingDataQualityManager(db=self._db, settings=self._settings)
+            validation = quality_manager.validate_for_training(request.collection_id)
+            if not validation.is_valid:
+                blocking_msgs = "; ".join(i.message for i in validation.blocking_issues)
+                raise ValueError(f"Quality gate failed: {blocking_msgs}")
+
         # Get approved pairs
         pairs = qa_pairs_repository.list_approved_for_export(
             self._db,
