@@ -174,16 +174,16 @@ export default function MlImprove() {
     try {
       const ratingParam = ratingFilter === 'all' ? '' : `&rating=${ratingFilter}`;
       const [feedbackResp, statsResp, gapsResp] = await Promise.all([
-        get<{ items: FeedbackItem[] }>(`/api/ml-improve/feedback?page_size=20${ratingParam}`),
+        get<FeedbackItem[]>(`/api/ml-improve/feedback?limit=20${ratingParam}`),
         get<FeedbackStats>('/api/ml-improve/feedback/stats?days=30'),
-        get<{ gaps: Gap[], total: number }>('/api/ml-improve/gaps?page_size=10'),
+        get<Gap[]>('/api/ml-improve/gaps?limit=10'),
       ]);
       const feedback = checkApiResponse(feedbackResp, 'Feedback');
       const statsData = checkApiResponse(statsResp, 'Stats');
       const gapsData = checkApiResponse(gapsResp, 'Gaps');
-      setFeedbackItems(feedback.items || []);
+      setFeedbackItems(Array.isArray(feedback) ? feedback : []);
       setStats(statsData);
-      setGaps(gapsData.gaps || []);
+      setGaps(Array.isArray(gapsData) ? gapsData : []);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load improvement data';
       setError(message);

@@ -122,9 +122,9 @@ class SheetBase(BaseModel):
     source_table: Optional[str] = Field(None, description="Table name")
     source_volume: Optional[str] = Field(None, description="Volume path for files")
     source_path: Optional[str] = Field(None, description="Path within volume or external URL")
-    text_columns: List[str] = Field(default_factory=list, description="Columns containing text data")
-    image_columns: List[str] = Field(default_factory=list, description="Columns containing image paths")
-    metadata_columns: List[str] = Field(default_factory=list, description="Columns containing metadata")
+    text_columns: Optional[List[str]] = Field(default_factory=list, description="Columns containing text data")
+    image_columns: Optional[List[str]] = Field(default_factory=list, description="Columns containing image paths")
+    metadata_columns: Optional[List[str]] = Field(default_factory=list, description="Columns containing metadata")
     id_column: Optional[str] = Field(None, description="Primary key column in source")
     sampling_strategy: SheetSamplingStrategy = Field(SheetSamplingStrategy.ALL, description="Sampling strategy")
     sample_size: Optional[int] = Field(None, ge=1, description="Number of samples to take")
@@ -187,15 +187,15 @@ class PromptTemplateBase(BaseModel):
     status: TemplateStatus = Field(TemplateStatus.DRAFT, description="Template status")
     system_prompt: Optional[str] = Field(None, description="System prompt for the LLM")
     user_prompt_template: str = Field(..., description="User prompt template with {{variable}} placeholders")
-    few_shot_examples: List[Dict[str, Any]] = Field(default_factory=list, description="Few-shot examples")
+    few_shot_examples: Optional[List[Dict[str, Any]]] = Field(default_factory=list, description="Few-shot examples")
     output_schema: Optional[Dict[str, Any]] = Field(None, description="JSON Schema for structured output")
     label_type: Optional[LabelType] = Field(None, description="Type of label this template produces")
     custom_label_type: Optional[str] = Field(None, description="Custom label type name")
     default_model: Optional[str] = Field("databricks-meta-llama-3-1-70b-instruct", description="Default model")
     default_temperature: Optional[float] = Field(0.7, ge=0, le=2, description="Default temperature")
     default_max_tokens: Optional[int] = Field(1024, ge=1, description="Default max tokens")
-    variable_mappings: Dict[str, str] = Field(default_factory=dict, description="Maps {{variables}} to sheet columns")
-    tags: List[str] = Field(default_factory=list, description="Tags for organization")
+    variable_mappings: Optional[Dict[str, str]] = Field(default_factory=dict, description="Maps {{variables}} to sheet columns")
+    tags: Optional[List[str]] = Field(default_factory=list, description="Tags for organization")
 
 
 class PromptTemplateCreate(PromptTemplateBase):
@@ -333,7 +333,7 @@ class TrainingCollectionBase(BaseModel):
     default_train_ratio: float = Field(0.8, ge=0, le=1, description="Default training split ratio")
     default_val_ratio: float = Field(0.1, ge=0, le=1, description="Default validation split ratio")
     default_test_ratio: float = Field(0.1, ge=0, le=1, description="Default test split ratio")
-    tags: List[str] = Field(default_factory=list, description="Tags for organization")
+    tags: Optional[List[str]] = Field(default_factory=list, description="Tags for organization")
 
     @model_validator(mode='after')
     def validate_split_ratios(self):
@@ -422,10 +422,10 @@ class QAPairBase(BaseModel):
     source_item_ref: Optional[str] = Field(None, description="Reference to source data item")
     review_status: QAPairReviewStatus = Field(QAPairReviewStatus.PENDING, description="Review status")
     quality_score: Optional[float] = Field(None, ge=0, le=1, description="Quality score 0-1")
-    quality_flags: List[str] = Field(default_factory=list, description="Quality issue flags")
+    quality_flags: Optional[List[str]] = Field(default_factory=list, description="Quality issue flags")
     split: Optional[str] = Field(None, description="Dataset split: train, val, test")
-    sampling_weight: float = Field(1.0, ge=0, description="Sampling weight for this pair")
-    semantic_concept_iris: List[str] = Field(default_factory=list, description="Linked ontology concept IRIs")
+    sampling_weight: Optional[float] = Field(1.0, ge=0, description="Sampling weight for this pair")
+    semantic_concept_iris: Optional[List[str]] = Field(default_factory=list, description="Linked ontology concept IRIs")
 
 
 class QAPairCreate(QAPairBase):
@@ -645,7 +645,7 @@ class DSPyRun(BaseModel):
     trials_total: Optional[int] = None
     best_score: Optional[float] = None
     results: Optional[Dict[str, Any]] = None
-    top_example_ids: List[str] = Field(default_factory=list)
+    top_example_ids: Optional[List[str]] = Field(default_factory=list)
     error_message: Optional[str] = None
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
@@ -670,7 +670,7 @@ class ExampleBase(BaseModel):
     task_type: Optional[str] = Field(None, description="Task type")
     difficulty: Optional[str] = Field(None, description="Difficulty level")
     function_name: Optional[str] = Field(None, description="Function name for function-calling")
-    capability_tags: List[str] = Field(default_factory=list, description="Capability tags")
+    capability_tags: Optional[List[str]] = Field(default_factory=list, description="Capability tags")
     is_verified: bool = Field(False, description="Whether verified by expert")
 
 

@@ -3,6 +3,7 @@
   "groups": {
     "dataProducts": "Data Products",
     "governance": "Governance",
+    "vitalStages": "VITAL Stages",
     "operations": "Operations",
     "security": "Security",
     "system": "System"

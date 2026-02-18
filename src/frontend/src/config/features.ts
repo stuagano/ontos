@@ -35,7 +35,7 @@ import {
   } from 'lucide-react';
   
   export type FeatureMaturity = 'ga' | 'beta' | 'alpha';
-  export type FeatureGroup = 'Data Products' | 'Governance' | 'ML Lifecycle' | 'Operations' | 'Security' | 'System';
+  export type FeatureGroup = 'Data Products' | 'Governance' | 'VITAL Stages' | 'Operations' | 'Security' | 'System';
   
   export interface FeatureConfig {
     id: string; // Unique identifier, e.g., 'data-products'
@@ -182,45 +182,25 @@ import {
       maturity: 'beta',
       showInLanding: true,
     },
-    // ML Lifecycle - VITAL platform integration
+    // VITAL Stages — DATA → GENERATE → LABEL → TRAIN → DEPLOY → MONITOR → IMPROVE
+    {
+      id: 'ml-sheets',
+      name: 'Data (Sheets)',
+      path: '/ml-sheets',
+      description: 'Define dataset sources from Unity Catalog with column mapping.',
+      icon: FileSpreadsheet,
+      group: 'VITAL Stages',
+      maturity: 'alpha',
+      showInLanding: true,
+    },
     {
       id: 'training-data',
-      name: 'Training Data',
+      name: 'Generate',
       path: '/training-data',
-      description: 'Curate ML training data collections, labels, and QA pairs.',
+      description: 'Generate Q&A training pairs from sheets and prompt templates.',
       icon: GraduationCap,
-      group: 'ML Lifecycle',
+      group: 'VITAL Stages',
       maturity: 'beta',
-      showInLanding: true,
-    },
-    {
-      id: 'ml-deploy',
-      name: 'Deploy',
-      path: '/ml-deploy',
-      description: 'Deploy trained models to serving endpoints with testing playground.',
-      icon: Rocket,
-      group: 'ML Lifecycle',
-      maturity: 'alpha',
-      showInLanding: true,
-    },
-    {
-      id: 'ml-monitor',
-      name: 'Monitor',
-      path: '/ml-monitor',
-      description: 'Monitor model performance, latency, drift, and throughput.',
-      icon: Activity,
-      group: 'ML Lifecycle',
-      maturity: 'alpha',
-      showInLanding: true,
-    },
-    {
-      id: 'ml-improve',
-      name: 'Improve',
-      path: '/ml-improve',
-      description: 'Collect feedback, analyze gaps, and iterate on model quality.',
-      icon: RefreshCcw,
-      group: 'ML Lifecycle',
-      maturity: 'alpha',
       showInLanding: true,
     },
     {
@@ -229,37 +209,27 @@ import {
       path: '/ml-templates',
       description: 'Build and manage prompt templates for ML data generation.',
       icon: Wand2,
-      group: 'ML Lifecycle',
-      maturity: 'alpha',
-      showInLanding: false,
-    },
-    {
-      id: 'ml-sheets',
-      name: 'Sheets',
-      path: '/ml-sheets',
-      description: 'Define dataset sources from Unity Catalog with column mapping.',
-      icon: FileSpreadsheet,
-      group: 'ML Lifecycle',
+      group: 'VITAL Stages',
       maturity: 'alpha',
       showInLanding: false,
     },
     {
       id: 'ml-labels',
-      name: 'Labels',
+      name: 'Label',
       path: '/ml-labels',
       description: 'Manage canonical labels for expert-validated ground truth.',
       icon: Tag,
-      group: 'ML Lifecycle',
+      group: 'VITAL Stages',
       maturity: 'alpha',
-      showInLanding: false,
+      showInLanding: true,
     },
     {
       id: 'ml-curate',
-      name: 'Curate',
+      name: 'Curate & Review',
       path: '/ml-curate',
       description: 'Review and label Q&A pairs in training collections.',
       icon: ClipboardList,
-      group: 'ML Lifecycle',
+      group: 'VITAL Stages',
       maturity: 'alpha',
       showInLanding: false,
     },
@@ -269,9 +239,9 @@ import {
       path: '/ml-train',
       description: 'Configure and monitor model fine-tuning jobs.',
       icon: Dumbbell,
-      group: 'ML Lifecycle',
+      group: 'VITAL Stages',
       maturity: 'alpha',
-      showInLanding: false,
+      showInLanding: true,
     },
     {
       id: 'ml-dspy',
@@ -279,7 +249,7 @@ import {
       path: '/ml-dspy',
       description: 'Automatically optimize prompt templates with DSPy.',
       icon: Zap,
-      group: 'ML Lifecycle',
+      group: 'VITAL Stages',
       maturity: 'alpha',
       showInLanding: false,
     },
@@ -289,9 +259,39 @@ import {
       path: '/ml-examples',
       description: 'Manage few-shot learning examples for DSPy and inference.',
       icon: Lightbulb,
-      group: 'ML Lifecycle',
+      group: 'VITAL Stages',
       maturity: 'alpha',
       showInLanding: false,
+    },
+    {
+      id: 'ml-deploy',
+      name: 'Deploy',
+      path: '/ml-deploy',
+      description: 'Deploy trained models to serving endpoints with testing playground.',
+      icon: Rocket,
+      group: 'VITAL Stages',
+      maturity: 'alpha',
+      showInLanding: true,
+    },
+    {
+      id: 'ml-monitor',
+      name: 'Monitor',
+      path: '/ml-monitor',
+      description: 'Monitor model performance, latency, drift, and throughput.',
+      icon: Activity,
+      group: 'VITAL Stages',
+      maturity: 'alpha',
+      showInLanding: true,
+    },
+    {
+      id: 'ml-improve',
+      name: 'Improve',
+      path: '/ml-improve',
+      description: 'Collect feedback, analyze gaps, and iterate on model quality.',
+      icon: RefreshCcw,
+      group: 'VITAL Stages',
+      maturity: 'alpha',
+      showInLanding: true,
     },
     {
       id: 'catalog-commander',
@@ -404,7 +404,7 @@ import {
         });
   
       // Define the desired order of groups
-      const groupOrder: FeatureGroup[] = ['Data Products', 'Governance', 'ML Lifecycle', 'Operations', 'Security', 'System'];
+      const groupOrder: FeatureGroup[] = ['Data Products', 'Governance', 'VITAL Stages', 'Operations', 'Security', 'System'];
   
       // Sort groups according to the defined order
       return groupOrder

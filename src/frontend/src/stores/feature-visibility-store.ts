@@ -19,7 +19,7 @@ export const useFeatureVisibilityStore = create<FeatureVisibilityState>()(
       showBeta: true,
       showAlpha: true,
       // Compute allowedMaturities whenever state changes
-      allowedMaturities: ['ga'], // Initial value
+      allowedMaturities: ['ga', 'beta', 'alpha'], // Initial value — match showBeta/showAlpha defaults
 
       actions: {
         toggleBeta: () => set((state) => {

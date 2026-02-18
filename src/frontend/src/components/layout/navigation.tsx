@@ -96,6 +96,7 @@ export function Navigation({ isCollapsed }: NavigationProps) {
   const groupKeyMap: Record<string, string> = {
     'Data Products': 'dataProducts',
     'Governance': 'governance',
+    'VITAL Stages': 'vitalStages',
     'Operations': 'operations',
     'Security': 'security',
     'System': 'system',

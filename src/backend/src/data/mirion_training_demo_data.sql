@@ -27,7 +27,7 @@
 -- All INSERTs use ON CONFLICT (id) DO NOTHING for idempotent reloads.
 -- =============================================================================
 
-BEGIN;
+-- Each INSERT is its own implicit transaction for resilience
 
 -- =============================================================================
 -- 1. SHEETS — One per Mirion domain
@@ -236,73 +236,73 @@ ON CONFLICT (id) DO NOTHING;
 -- =============================================================================
 
 -- Defect Detection Labels (6 from labels.json samples)
-INSERT INTO canonical_labels (id, sheet_id, item_ref, label_type, label_data, confidence, is_verified, verified_by, allowed_uses, data_classification, created_by) VALUES
+INSERT INTO canonical_labels (id, sheet_id, item_ref, label_type, label_data, confidence, is_verified, verified_by, allowed_uses, prohibited_uses, reuse_count, data_classification, created_by) VALUES
 ('0a200001-0000-4000-8000-000000000001', '0a000001-0000-4000-8000-000000000001', 'INSP-2024-001', 'classification',
  '{"defect_class":"NONE","confidence":0.95,"severity":0,"equipment_id":"DET-NPP-COOK-001","facility":"Cook Nuclear Plant"}',
- 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], 'internal', 'stuart.gano@databricks.com'),
+ 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], ARRAY[]::varchar[], 0, 'internal', 'stuart.gano@databricks.com'),
 ('0a200002-0000-4000-8000-000000000002', '0a000001-0000-4000-8000-000000000001', 'INSP-2024-002', 'classification',
  '{"defect_class":"MINOR_SCRATCH","confidence":0.87,"severity":1,"bounding_box":{"x":120,"y":85,"width":45,"height":12},"equipment_id":"DET-NPP-COOK-002","facility":"Cook Nuclear Plant"}',
- 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], 'internal', 'stuart.gano@databricks.com'),
+ 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], ARRAY[]::varchar[], 0, 'internal', 'stuart.gano@databricks.com'),
 ('0a200003-0000-4000-8000-000000000003', '0a000001-0000-4000-8000-000000000001', 'INSP-2024-003', 'classification',
  '{"defect_class":"CRYSTAL_CRACK","confidence":0.92,"severity":3,"bounding_box":{"x":200,"y":150,"width":80,"height":25},"equipment_id":"DET-NPP-PALO-001","facility":"Palo Verde"}',
- 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], 'internal', 'stuart.gano@databricks.com'),
+ 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], ARRAY[]::varchar[], 0, 'internal', 'stuart.gano@databricks.com'),
 ('0a200004-0000-4000-8000-000000000004', '0a000001-0000-4000-8000-000000000001', 'INSP-2024-004', 'classification',
  '{"defect_class":"SEAL_DEGRADATION","confidence":0.78,"severity":2,"equipment_id":"DET-NPP-WATTS-003","facility":"Watts Bar Nuclear Plant"}',
- 'medium', false, NULL, ARRAY['training','validation','evaluation'], 'internal', 'stuart.gano@databricks.com'),
+ 'medium', false, NULL, ARRAY['training','validation','evaluation'], ARRAY[]::varchar[], 0, 'internal', 'stuart.gano@databricks.com'),
 ('0a200005-0000-4000-8000-000000000005', '0a000001-0000-4000-8000-000000000001', 'INSP-2024-005', 'classification',
  '{"defect_class":"CONNECTOR_DAMAGE","confidence":0.91,"severity":3,"bounding_box":{"x":50,"y":180,"width":30,"height":40},"equipment_id":"DET-NPP-DIABLO-002","facility":"Diablo Canyon"}',
- 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], 'internal', 'stuart.gano@databricks.com'),
+ 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], ARRAY[]::varchar[], 0, 'internal', 'stuart.gano@databricks.com'),
 ('0a200006-0000-4000-8000-000000000006', '0a000001-0000-4000-8000-000000000001', 'INSP-2024-006', 'classification',
  '{"defect_class":"CORROSION","confidence":0.85,"severity":3,"bounding_box":{"x":75,"y":220,"width":60,"height":35},"equipment_id":"DET-NPP-SURRY-001","facility":"Surry Nuclear Power Plant"}',
- 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], 'internal', 'stuart.gano@databricks.com'),
+ 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], ARRAY[]::varchar[], 0, 'internal', 'stuart.gano@databricks.com'),
 
 -- Anomaly Detection Labels (6 from anomalies.json)
 ('0a200007-0000-4000-8000-000000000007', '0a000003-0000-4000-8000-000000000003', 'ANOM-2024-001', 'classification',
  '{"anomaly_type":"SENSOR_DRIFT","severity":"medium","confidence":0.89,"affected_metric":"count_rate_cps","deviation_pct":-4.5}',
- 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], 'internal', 'stuart.gano@databricks.com'),
+ 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], ARRAY[]::varchar[], 0, 'internal', 'stuart.gano@databricks.com'),
 ('0a200008-0000-4000-8000-000000000008', '0a000003-0000-4000-8000-000000000003', 'ANOM-2024-002', 'classification',
  '{"anomaly_type":"SPIKE","severity":"high","confidence":0.95,"affected_metric":"current_ma","deviation_pct":19.0}',
- 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], 'internal', 'stuart.gano@databricks.com'),
+ 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], ARRAY[]::varchar[], 0, 'internal', 'stuart.gano@databricks.com'),
 ('0a200009-0000-4000-8000-000000000009', '0a000003-0000-4000-8000-000000000003', 'ANOM-2024-003', 'classification',
  '{"anomaly_type":"HUMIDITY_ALERT","severity":"medium","confidence":0.92,"affected_metric":"humidity_pct","deviation_pct":44.0}',
- 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], 'internal', 'stuart.gano@databricks.com'),
+ 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], ARRAY[]::varchar[], 0, 'internal', 'stuart.gano@databricks.com'),
 ('0a200010-0000-4000-8000-000000000010', '0a000003-0000-4000-8000-000000000003', 'ANOM-2024-004', 'classification',
  '{"anomaly_type":"NOISE_INCREASE","severity":"low","confidence":0.78,"affected_metric":"noise_level_mv","deviation_pct":83.3}',
- 'medium', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation'], 'internal', 'stuart.gano@databricks.com'),
+ 'medium', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation'], ARRAY[]::varchar[], 0, 'internal', 'stuart.gano@databricks.com'),
 ('0a200011-0000-4000-8000-000000000011', '0a000003-0000-4000-8000-000000000003', 'ANOM-2024-005', 'classification',
  '{"anomaly_type":"CALIBRATION_DRIFT","severity":"high","confidence":0.86,"affected_metric":"voltage_v","deviation_pct":-1.8}',
- 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], 'internal', 'stuart.gano@databricks.com'),
+ 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], ARRAY[]::varchar[], 0, 'internal', 'stuart.gano@databricks.com'),
 ('0a200012-0000-4000-8000-000000000012', '0a000003-0000-4000-8000-000000000003', 'ANOM-2024-006', 'classification',
  '{"anomaly_type":"PLATEAU_SHIFT","severity":"medium","confidence":0.82,"affected_metric":"count_rate_cps","deviation_pct":-9.4}',
- 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], 'internal', 'stuart.gano@databricks.com'),
+ 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], ARRAY[]::varchar[], 0, 'internal', 'stuart.gano@databricks.com'),
 
 -- Predictive Maintenance Labels (5 equipment health assessments)
 ('0a200013-0000-4000-8000-000000000013', '0a000002-0000-4000-8000-000000000002', 'DET-NPP-COOK-001', 'classification',
  '{"health_status":"operational","health_score":0.92,"risk_level":"low","failure_probability_30d":0.02}',
- 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], 'internal', 'stuart.gano@databricks.com'),
+ 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], ARRAY[]::varchar[], 0, 'internal', 'stuart.gano@databricks.com'),
 ('0a200014-0000-4000-8000-000000000014', '0a000002-0000-4000-8000-000000000002', 'DET-NPP-PALO-001', 'classification',
  '{"health_status":"degraded","health_score":0.58,"risk_level":"high","failure_probability_30d":0.18}',
- 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], 'internal', 'stuart.gano@databricks.com'),
+ 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], ARRAY[]::varchar[], 0, 'internal', 'stuart.gano@databricks.com'),
 ('0a200015-0000-4000-8000-000000000015', '0a000002-0000-4000-8000-000000000002', 'DET-NPP-DIABLO-002', 'classification',
  '{"health_status":"at_risk","health_score":0.72,"risk_level":"high","failure_probability_30d":0.45}',
- 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], 'internal', 'stuart.gano@databricks.com'),
+ 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], ARRAY[]::varchar[], 0, 'internal', 'stuart.gano@databricks.com'),
 ('0a200016-0000-4000-8000-000000000016', '0a000002-0000-4000-8000-000000000002', 'DET-NPP-WATTS-003', 'classification',
  '{"health_status":"operational","health_score":0.85,"risk_level":"medium","failure_probability_30d":0.08}',
- 'medium', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation'], 'internal', 'stuart.gano@databricks.com'),
+ 'medium', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation'], ARRAY[]::varchar[], 0, 'internal', 'stuart.gano@databricks.com'),
 ('0a200017-0000-4000-8000-000000000017', '0a000002-0000-4000-8000-000000000002', 'PM-NPP-SURRY-001', 'classification',
  '{"health_status":"degraded","health_score":0.65,"risk_level":"medium","failure_probability_30d":0.12}',
- 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], 'internal', 'stuart.gano@databricks.com')
+ 'high', true, 'stuart.gano@databricks.com', ARRAY['training','validation','evaluation','few_shot','testing'], ARRAY[]::varchar[], 0, 'internal', 'stuart.gano@databricks.com')
 ON CONFLICT (id) DO NOTHING;
 
 -- =============================================================================
 -- 4. TRAINING COLLECTIONS — One per domain
 -- =============================================================================
 
-INSERT INTO training_collections (id, name, description, version, status, sheet_id, template_id, generation_method, model_used, total_pairs, approved_pairs, rejected_pairs, pending_pairs, tags, owner_id, created_by) VALUES
-('0a300001-0000-4000-8000-000000000001', 'Mirion Defect Detection v1', 'QA pairs for defect detection in radiation detectors across nuclear facilities', '1.0.0', 'review', '0a000001-0000-4000-8000-000000000001', '0a100001-0000-4000-8000-000000000001', 'llm', 'gemini-2.0-flash', 6, 5, 0, 1, ARRAY['defect-detection','mirion','nuclear'], 'stuart.gano@databricks.com', 'stuart.gano@databricks.com'),
-('0a300002-0000-4000-8000-000000000002', 'Mirion Predictive Maintenance v1', 'QA pairs for predicting equipment failures from telemetry data', '1.0.0', 'review', '0a000002-0000-4000-8000-000000000002', '0a100002-0000-4000-8000-000000000002', 'llm', 'gemini-2.0-flash', 6, 5, 0, 1, ARRAY['predictive-maintenance','mirion','nuclear'], 'stuart.gano@databricks.com', 'stuart.gano@databricks.com'),
-('0a300003-0000-4000-8000-000000000003', 'Mirion Anomaly Detection v1', 'QA pairs for real-time anomaly detection and explanation in sensor streams', '1.0.0', 'review', '0a000003-0000-4000-8000-000000000003', '0a100003-0000-4000-8000-000000000003', 'llm', 'gemini-2.0-flash', 6, 5, 0, 1, ARRAY['anomaly-detection','mirion','nuclear'], 'stuart.gano@databricks.com', 'stuart.gano@databricks.com'),
-('0a300004-0000-4000-8000-000000000004', 'Mirion Calibration Insights v1', 'QA pairs for Monte Carlo calibration analysis and recommendations', '1.0.0', 'review', '0a000004-0000-4000-8000-000000000004', '0a100004-0000-4000-8000-000000000004', 'llm', 'gemini-2.0-flash', 6, 4, 1, 1, ARRAY['calibration','mirion','nuclear'], 'stuart.gano@databricks.com', 'stuart.gano@databricks.com')
+INSERT INTO training_collections (id, name, description, version, status, sheet_id, template_id, generation_method, model_used, total_pairs, approved_pairs, rejected_pairs, pending_pairs, default_train_ratio, default_val_ratio, default_test_ratio, tags, owner_id, created_by) VALUES
+('0a300001-0000-4000-8000-000000000001', 'Mirion Defect Detection v1', 'QA pairs for defect detection in radiation detectors across nuclear facilities', '1.0.0', 'review', '0a000001-0000-4000-8000-000000000001', '0a100001-0000-4000-8000-000000000001', 'llm', 'gemini-2.0-flash', 6, 5, 0, 1, 0.8, 0.1, 0.1, ARRAY['defect-detection','mirion','nuclear'], 'stuart.gano@databricks.com', 'stuart.gano@databricks.com'),
+('0a300002-0000-4000-8000-000000000002', 'Mirion Predictive Maintenance v1', 'QA pairs for predicting equipment failures from telemetry data', '1.0.0', 'review', '0a000002-0000-4000-8000-000000000002', '0a100002-0000-4000-8000-000000000002', 'llm', 'gemini-2.0-flash', 6, 5, 0, 1, 0.8, 0.1, 0.1, ARRAY['predictive-maintenance','mirion','nuclear'], 'stuart.gano@databricks.com', 'stuart.gano@databricks.com'),
+('0a300003-0000-4000-8000-000000000003', 'Mirion Anomaly Detection v1', 'QA pairs for real-time anomaly detection and explanation in sensor streams', '1.0.0', 'review', '0a000003-0000-4000-8000-000000000003', '0a100003-0000-4000-8000-000000000003', 'llm', 'gemini-2.0-flash', 6, 5, 0, 1, 0.8, 0.1, 0.1, ARRAY['anomaly-detection','mirion','nuclear'], 'stuart.gano@databricks.com', 'stuart.gano@databricks.com'),
+('0a300004-0000-4000-8000-000000000004', 'Mirion Calibration Insights v1', 'QA pairs for Monte Carlo calibration analysis and recommendations', '1.0.0', 'review', '0a000004-0000-4000-8000-000000000004', '0a100004-0000-4000-8000-000000000004', 'llm', 'gemini-2.0-flash', 6, 4, 1, 1, 0.8, 0.1, 0.1, ARRAY['calibration','mirion','nuclear'], 'stuart.gano@databricks.com', 'stuart.gano@databricks.com')
 ON CONFLICT (id) DO NOTHING;
 
 -- =============================================================================
@@ -396,73 +396,73 @@ ON CONFLICT (id) DO NOTHING;
 -- =============================================================================
 
 -- Defect Detection Examples (8 from examples/defect_detection.json)
-INSERT INTO example_store (id, input_text, output_text, domain, task_type, difficulty, capability_tags, is_verified, created_by) VALUES
+INSERT INTO example_store (id, input_text, output_text, domain, task_type, difficulty, capability_tags, is_verified, usage_count, created_by) VALUES
 ('0a500001-0000-4000-8000-000000000001',
  'Front view of gamma detector DET-NPP-COOK-001 showing clean crystal housing with no visible damage. Temperature: 22.5°C, Humidity: 45%, Operating Hours: 8760.',
  '{"defect_class":"NONE","confidence":0.95,"severity":0,"action_required":"none","reasoning":"Crystal housing intact with no visible scratches, contamination, or structural damage."}',
- 'defect_detection', 'classification', 'easy', ARRAY['no_defect','routine_inspection'], true, 'stuart.gano@databricks.com'),
+ 'defect_detection', 'classification', 'easy', ARRAY['no_defect','routine_inspection'], true, 0, 'stuart.gano@databricks.com'),
 ('0a500002-0000-4000-8000-000000000002',
  'Side view of detector DET-NPP-COOK-002 showing 4cm surface scratch on housing exterior. Temperature: 23.1°C, Humidity: 44%, Operating Hours: 12450.',
  '{"defect_class":"MINOR_SCRATCH","confidence":0.87,"severity":1,"action_required":"monitor","reasoning":"Surface scratch on housing exterior does not penetrate to internal components."}',
- 'defect_detection', 'classification', 'easy', ARRAY['minor_defect','cosmetic_damage'], true, 'stuart.gano@databricks.com'),
+ 'defect_detection', 'classification', 'easy', ARRAY['minor_defect','cosmetic_damage'], true, 0, 'stuart.gano@databricks.com'),
 ('0a500003-0000-4000-8000-000000000003',
  'Crystal chamber view of detector DET-NPP-PALO-001 showing 3mm crack extending into scintillation crystal. Temperature: 28.5°C, Humidity: 35%, Operating Hours: 26500. Count rate anomaly detected.',
  '{"defect_class":"CRYSTAL_CRACK","confidence":0.92,"severity":3,"action_required":"immediate_replacement","reasoning":"Critical defect: crack in scintillation crystal correlates with 15% efficiency drop."}',
- 'defect_detection', 'classification', 'medium', ARRAY['critical_defect','crystal_damage','immediate_action'], true, 'stuart.gano@databricks.com'),
+ 'defect_detection', 'classification', 'medium', ARRAY['critical_defect','crystal_damage','immediate_action'], true, 0, 'stuart.gano@databricks.com'),
 ('0a500004-0000-4000-8000-000000000004',
  'Seal inspection of detector DET-NPP-WATTS-003 showing slight discoloration around hermetic seal area. Temperature: 21.0°C, Humidity: 52%, Operating Hours: 5200.',
  '{"defect_class":"SEAL_DEGRADATION","confidence":0.78,"severity":2,"action_required":"schedule_maintenance","reasoning":"Early signs of seal degradation. Discoloration may indicate moisture ingress pathway."}',
- 'defect_detection', 'classification', 'hard', ARRAY['seal_inspection','early_warning','preventive_maintenance'], true, 'stuart.gano@databricks.com'),
+ 'defect_detection', 'classification', 'hard', ARRAY['seal_inspection','early_warning','preventive_maintenance'], true, 0, 'stuart.gano@databricks.com'),
 ('0a500005-0000-4000-8000-000000000005',
  'Connector view of detector DET-NPP-DIABLO-002 showing bent pin on main signal connector. Temperature: 24.0°C, Operating Hours: 18200. Signal quality: degraded, intermittent readings.',
  '{"defect_class":"CONNECTOR_DAMAGE","confidence":0.91,"severity":3,"action_required":"immediate_repair","reasoning":"Bent connector pin causing intermittent signal loss. Critical safety risk."}',
- 'defect_detection', 'classification', 'medium', ARRAY['connector_damage','signal_issues','troubleshooting'], true, 'stuart.gano@databricks.com'),
+ 'defect_detection', 'classification', 'medium', ARRAY['connector_damage','signal_issues','troubleshooting'], true, 0, 'stuart.gano@databricks.com'),
 ('0a500006-0000-4000-8000-000000000006',
  'Housing exterior of detector DET-NPP-SURRY-001 showing rust spots and oxidation on metal frame. Temperature: 19.5°C, Humidity: 68%, Operating Hours: 32100. High humidity area.',
  '{"defect_class":"CORROSION","confidence":0.85,"severity":3,"action_required":"relocate_and_treat","reasoning":"Active corrosion due to high humidity environment (68%)."}',
- 'defect_detection', 'classification', 'medium', ARRAY['corrosion','environmental','preventive_action'], true, 'stuart.gano@databricks.com'),
+ 'defect_detection', 'classification', 'medium', ARRAY['corrosion','environmental','preventive_action'], true, 0, 'stuart.gano@databricks.com'),
 ('0a500007-0000-4000-8000-000000000007',
  'Optical window view of detector DET-MED-CLINIC-005 showing slight hazing on detector window surface. Temperature: 22.0°C, Operating Hours: 4500. Medical imaging application.',
  '{"defect_class":"WINDOW_CLOUDING","confidence":0.72,"severity":2,"action_required":"clean_and_reassess","reasoning":"Possible window clouding. Could be surface contamination rather than permanent degradation."}',
- 'defect_detection', 'classification', 'hard', ARRAY['window_inspection','ambiguous_case','cleaning_protocol'], true, 'stuart.gano@databricks.com'),
+ 'defect_detection', 'classification', 'hard', ARRAY['window_inspection','ambiguous_case','cleaning_protocol'], true, 0, 'stuart.gano@databricks.com'),
 ('0a500008-0000-4000-8000-000000000008',
  'Full detector assembly DET-NPP-BYRON-001 showing foreign particle lodged between housing and mounting bracket. Temperature: 25.0°C, Operating Hours: 15000. Vibration detected.',
  '{"defect_class":"CONTAMINATION","confidence":0.88,"severity":2,"action_required":"remove_debris","reasoning":"Foreign debris in mounting area likely source of vibration. Could lead to connector fatigue."}',
- 'defect_detection', 'classification', 'medium', ARRAY['contamination','debris','vibration','mounting'], true, 'stuart.gano@databricks.com'),
+ 'defect_detection', 'classification', 'medium', ARRAY['contamination','debris','vibration','mounting'], true, 0, 'stuart.gano@databricks.com'),
 
 -- Predictive Maintenance Examples (8 from examples/predictive_maintenance.json)
 ('0a500009-0000-4000-8000-000000000009',
  'Equipment DET-NPP-COOK-001 (gamma_detector). Operating hours: 8760. Temperature: 22.5°C (variance: 1.2). Humidity: 45%. Count rate stability: 0.98. HV stability: 0.99. Calibration drift: 0.5%. Last calibration: 2023-11-01.',
  '{"failure_probability_30d":0.02,"failure_probability_90d":0.05,"remaining_useful_life_days":450,"risk_level":"low","reasoning":"Excellent stability across all metrics. Low operating hours, minimal calibration drift."}',
- 'predictive_maintenance', 'classification', 'easy', ARRAY['healthy_equipment','low_risk','routine_maintenance'], true, 'stuart.gano@databricks.com'),
+ 'predictive_maintenance', 'classification', 'easy', ARRAY['healthy_equipment','low_risk','routine_maintenance'], true, 0, 'stuart.gano@databricks.com'),
 ('0a500010-0000-4000-8000-000000000010',
  'Equipment DET-NPP-PALO-003 (gamma_detector). Operating hours: 35000. Temperature: 29.5°C (variance: 4.8). Humidity: 55%. Count rate stability: 0.89. HV stability: 0.94. Calibration drift: 3.2%. Efficiency declining 2.1% over 30 days.',
  '{"failure_probability_30d":0.18,"failure_probability_90d":0.42,"remaining_useful_life_days":120,"risk_level":"high","reasoning":"Multiple warning indicators: high operating hours, declining efficiency, elevated calibration drift."}',
- 'predictive_maintenance', 'classification', 'medium', ARRAY['high_risk','aging_equipment','multiple_indicators'], true, 'stuart.gano@databricks.com'),
+ 'predictive_maintenance', 'classification', 'medium', ARRAY['high_risk','aging_equipment','multiple_indicators'], true, 0, 'stuart.gano@databricks.com'),
 ('0a500011-0000-4000-8000-000000000011',
  'Equipment DET-NPP-WATTS-007 (neutron_detector). Operating hours: 18500. HV stability: 0.88. Pulse shape anomaly count: 15. Calibration drift: 1.8%.',
  '{"failure_probability_30d":0.12,"failure_probability_90d":0.28,"remaining_useful_life_days":180,"risk_level":"medium","reasoning":"HV supply showing early instability combined with pulse shape anomalies suggests developing power supply issue."}',
- 'predictive_maintenance', 'classification', 'medium', ARRAY['hv_supply','pulse_anomaly','subsystem_failure'], true, 'stuart.gano@databricks.com'),
+ 'predictive_maintenance', 'classification', 'medium', ARRAY['hv_supply','pulse_anomaly','subsystem_failure'], true, 0, 'stuart.gano@databricks.com'),
 ('0a500012-0000-4000-8000-000000000012',
  'Equipment DET-MED-HOSPITAL-012 (scintillation_detector). Operating hours: 5200. Temperature: 21.0°C (variance: 0.8). Energy resolution: 7.8 keV (stable). Climate-controlled hospital setting.',
  '{"failure_probability_30d":0.01,"failure_probability_90d":0.03,"remaining_useful_life_days":800,"risk_level":"low","reasoning":"Medical imaging detector in excellent condition. Controlled environment, excellent energy resolution."}',
- 'predictive_maintenance', 'classification', 'easy', ARRAY['medical_application','healthy','quality_critical'], true, 'stuart.gano@databricks.com'),
+ 'predictive_maintenance', 'classification', 'easy', ARRAY['medical_application','healthy','quality_critical'], true, 0, 'stuart.gano@databricks.com'),
 ('0a500013-0000-4000-8000-000000000013',
  'Equipment DET-NPP-DIABLO-005 (area_monitor). Operating hours: 52000. Calibration drift: 2.5%. Background rate increase: 8%. 18 maintenance events. Planned decommission: 2025-06-01.',
  '{"failure_probability_30d":0.08,"failure_probability_90d":0.22,"remaining_useful_life_days":250,"risk_level":"medium","reasoning":"Aging area monitor approaching planned decommission. Focus on maintaining acceptable performance through remaining service life."}',
- 'predictive_maintenance', 'classification', 'hard', ARRAY['end_of_life','decommission_planning','cost_benefit'], true, 'stuart.gano@databricks.com'),
+ 'predictive_maintenance', 'classification', 'hard', ARRAY['end_of_life','decommission_planning','cost_benefit'], true, 0, 'stuart.gano@databricks.com'),
 ('0a500014-0000-4000-8000-000000000014',
  'Equipment DET-NPP-BYRON-009 (gamma_detector). Operating hours: 12000. Temperature: 31.5°C (variance: 6.2). Humidity: 72%. Located in turbine building auxiliary area.',
  '{"failure_probability_30d":0.15,"failure_probability_90d":0.35,"remaining_useful_life_days":200,"risk_level":"high","reasoning":"Environmental stress is primary concern: high temperature, high variance, excessive humidity accelerating degradation."}',
- 'predictive_maintenance', 'classification', 'medium', ARRAY['environmental_stress','humidity','temperature'], true, 'stuart.gano@databricks.com'),
+ 'predictive_maintenance', 'classification', 'medium', ARRAY['environmental_stress','humidity','temperature'], true, 0, 'stuart.gano@databricks.com'),
 ('0a500015-0000-4000-8000-000000000015',
  'Equipment DET-NPP-SURRY-002 (gamma_detector). Operating hours: 22000. Count rate stability: 0.85. Calibration drift: 4.5%. Last 24h readings: [142, 138, 145, 89, 141, 140, 143, 85, 139, 142]. Anomaly: intermittent dropouts.',
  '{"failure_probability_30d":0.25,"failure_probability_90d":0.55,"remaining_useful_life_days":90,"risk_level":"critical","reasoning":"CRITICAL: Intermittent dropout pattern visible. Signal chain degradation indicates imminent failure."}',
- 'predictive_maintenance', 'classification', 'hard', ARRAY['critical_failure','intermittent','signal_chain'], true, 'stuart.gano@databricks.com'),
+ 'predictive_maintenance', 'classification', 'hard', ARRAY['critical_failure','intermittent','signal_chain'], true, 0, 'stuart.gano@databricks.com'),
 ('0a500016-0000-4000-8000-000000000016',
  'Equipment DET-NPP-COOK-015 (neutron_detector). Operating hours: 28000. He-3 pressure: 3.8 psi (spec: 4.0). Pressure history: [4.0, 3.95, 3.9, 3.85, 3.8].',
  '{"failure_probability_30d":0.10,"failure_probability_90d":0.30,"remaining_useful_life_days":365,"risk_level":"medium","reasoning":"He-3 pressure declining. Slow leak in neutron detector tube. Early intervention preferred over tube replacement."}',
- 'predictive_maintenance', 'classification', 'hard', ARRAY['neutron_detector','he3','slow_leak','specialized'], true, 'stuart.gano@databricks.com')
+ 'predictive_maintenance', 'classification', 'hard', ARRAY['neutron_detector','he3','slow_leak','specialized'], true, 0, 'stuart.gano@databricks.com')
 ON CONFLICT (id) DO NOTHING;
 
 -- =============================================================================
@@ -532,28 +532,11 @@ INSERT INTO ml_identified_gaps (id, gap_type, severity, description, model_name,
 ON CONFLICT (id) DO NOTHING;
 
 -- =============================================================================
--- 9. QUALITY CHECKS — Sample check definitions (requires quality tables)
+-- 9. QUALITY CHECKS — Skipped: training_data_quality_checks table not yet created
+-- =============================================================================
+-- (These tables need to be created via Alembic migration first)
+
+-- 10. QUALITY RUNS — Skipped: training_data_quality_runs table not yet created
 -- =============================================================================
 
-INSERT INTO training_data_quality_checks (id, collection_id, check_name, check_function, column_name, criticality, parameters, created_by) VALUES
-('0a800001-0000-4000-8000-000000000001', '0a300001-0000-4000-8000-000000000001', 'Message completeness', 'message_completeness', 'messages', 'blocking', '{"min_roles":["system","user","assistant"]}', 'stuart.gano@databricks.com'),
-('0a800002-0000-4000-8000-000000000002', '0a300001-0000-4000-8000-000000000001', 'Response JSON validity', 'json_valid_response', 'messages', 'warning', NULL, 'stuart.gano@databricks.com'),
-('0a800003-0000-4000-8000-000000000003', '0a300001-0000-4000-8000-000000000001', 'Minimum response length', 'min_response_length', 'messages', 'warning', '{"min_chars":50}', 'stuart.gano@databricks.com'),
-('0a800004-0000-4000-8000-000000000004', '0a300001-0000-4000-8000-000000000001', 'Quality score threshold', 'quality_score_threshold', 'quality_score', 'info', '{"min_score":0.7}', 'stuart.gano@databricks.com'),
-('0a800005-0000-4000-8000-000000000005', '0a300002-0000-4000-8000-000000000002', 'Message completeness', 'message_completeness', 'messages', 'blocking', '{"min_roles":["system","user","assistant"]}', 'stuart.gano@databricks.com'),
-('0a800006-0000-4000-8000-000000000006', '0a300002-0000-4000-8000-000000000002', 'Response JSON validity', 'json_valid_response', 'messages', 'warning', NULL, 'stuart.gano@databricks.com'),
-('0a800007-0000-4000-8000-000000000007', '0a300003-0000-4000-8000-000000000003', 'Message completeness', 'message_completeness', 'messages', 'blocking', '{"min_roles":["system","user","assistant"]}', 'stuart.gano@databricks.com'),
-('0a800008-0000-4000-8000-000000000008', '0a300004-0000-4000-8000-000000000004', 'Message completeness', 'message_completeness', 'messages', 'blocking', '{"min_roles":["system","user","assistant"]}', 'stuart.gano@databricks.com')
-ON CONFLICT (id) DO NOTHING;
-
--- =============================================================================
--- 10. QUALITY RUNS — Sample run for defect detection collection
--- =============================================================================
-
-INSERT INTO training_data_quality_runs (id, collection_id, status, source, pass_rate, quality_score, check_results, started_at, completed_at, created_by) VALUES
-('0a900001-0000-4000-8000-000000000001', '0a300001-0000-4000-8000-000000000001', 'passed', 'mock', 1.0, 1.0,
- '[{"check_id":"0a800001-0000-4000-8000-000000000001","check_name":"Message completeness","passed":true,"criticality":"blocking","message":"6/6 pairs have all required roles","details":{"incomplete_count":0,"total":6}},{"check_id":"0a800002-0000-4000-8000-000000000002","check_name":"Response JSON validity","passed":true,"criticality":"warning","message":"All responses have valid JSON","details":{"invalid_count":0,"total":6}},{"check_id":"0a800003-0000-4000-8000-000000000003","check_name":"Minimum response length","passed":true,"criticality":"warning","message":"All responses >= 50 chars","details":{"short_count":0,"min_chars":50,"total":6}},{"check_id":"0a800004-0000-4000-8000-000000000004","check_name":"Quality score threshold","passed":true,"criticality":"info","message":"Avg quality score 0.88 >= 0.7","details":{"avg_score":0.88,"min_score":0.7,"scored_pairs":6}}]',
- '2026-02-17T10:00:00+00:00', '2026-02-17T10:00:01+00:00', 'stuart.gano@databricks.com')
-ON CONFLICT (id) DO NOTHING;
-
-COMMIT;
+-- Done

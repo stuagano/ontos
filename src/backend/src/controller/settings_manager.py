@@ -421,12 +421,40 @@ class SettingsManager:
         except Exception as e:
             logger.error(f"Error loading installations from database: {e}")
 
+    def _sync_admin_groups_from_env(self):
+        """Ensure Admin role's assigned_groups matches APP_ADMIN_DEFAULT_GROUPS env var."""
+        try:
+            groups_json = self._settings.APP_ADMIN_DEFAULT_GROUPS
+            if not groups_json:
+                return
+            admin_groups = json.loads(groups_json)
+            if not isinstance(admin_groups, list):
+                return
+            # Use repository to get the DB model directly
+            role_db = self.app_role_repo.get_by_name(db=self._db, name="Admin")
+            if not role_db:
+                return
+            try:
+                current_groups = json.loads(role_db.assigned_groups or '[]')
+            except (json.JSONDecodeError, TypeError):
+                current_groups = []
+            if set(current_groups) != set(admin_groups):
+                role_db.assigned_groups = json.dumps(admin_groups)
+                self._db.commit()
+                self._db.expire_all()
+                logger.info(f"Synced Admin role assigned_groups from env: {admin_groups}")
+        except Exception as e:
+            logger.warning(f"Could not sync Admin groups from env: {e}")
+            self._db.rollback()
+
     def ensure_default_roles_exist(self):
         """Checks if default roles exist and creates them if necessary."""
         try:
             existing_roles_count = self.get_app_roles_count()
             if existing_roles_count > 0:
                 logger.info(f"Found {existing_roles_count} existing roles. Skipping default role creation.")
+                # Always sync Admin role's assigned_groups from env on startup
+                self._sync_admin_groups_from_env()
                 return
 
             logger.info("No existing roles found. Creating default roles...")

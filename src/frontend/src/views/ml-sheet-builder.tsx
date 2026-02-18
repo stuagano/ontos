@@ -436,9 +436,9 @@ export default function MlSheetBuilder() {
     setLoading(true);
     setError(null);
     try {
-      const resp = await get<{ items: Sheet[], total: number }>('/api/training-data/sheets?page_size=100');
+      const resp = await get<Sheet[]>('/api/training-data/sheets?limit=100');
       const data = checkApiResponse(resp, 'Sheets');
-      setSheets(data.items || []);
+      setSheets(Array.isArray(data) ? data : []);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load sheets';
       setError(message);

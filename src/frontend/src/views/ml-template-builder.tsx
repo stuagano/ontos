@@ -482,9 +482,9 @@ export default function MlTemplateBuilder() {
     setLoading(true);
     setError(null);
     try {
-      const resp = await get<{ items: PromptTemplate[], total: number }>('/api/training-data/templates?page_size=100');
+      const resp = await get<PromptTemplate[]>('/api/training-data/templates?limit=100');
       const data = checkApiResponse(resp, 'Templates');
-      setTemplates(data.items || []);
+      setTemplates(Array.isArray(data) ? data : []);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load templates';
       setError(message);

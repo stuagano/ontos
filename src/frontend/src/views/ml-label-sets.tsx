@@ -355,9 +355,9 @@ export default function MlLabelSets() {
     setError(null);
     try {
       const typeParam = typeFilter !== 'all' ? `&label_type=${typeFilter}` : '';
-      const resp = await get<{ items: CanonicalLabel[], total: number }>(`/api/training-data/canonical-labels?page_size=100${typeParam}`);
+      const resp = await get<CanonicalLabel[]>(`/api/training-data/canonical-labels?limit=100${typeParam}`);
       const data = checkApiResponse(resp, 'Labels');
-      setLabels(data.items || []);
+      setLabels(Array.isArray(data) ? data : []);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load labels';
       setError(message);
